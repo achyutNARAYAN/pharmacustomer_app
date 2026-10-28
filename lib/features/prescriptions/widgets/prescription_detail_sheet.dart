@@ -1,82 +1,106 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/services/api_service.dart';
 import '../../../core/theme.dart';
 
 Future<void> showPrescriptionDetailSheet(
   BuildContext context, {
   required VoidCallback onArchive,
-}) => showModalBottomSheet<void>(
-  context: context,
-  isScrollControlled: true,
-  backgroundColor: Colors.transparent,
-  builder: (sheetContext) => Material(
-    color: Colors.white,
-    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-    child: SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: const Color(0xFFD8E0E0),
-                borderRadius: BorderRadius.circular(8),
+  String? prescriptionId,
+  String doctorName = 'Prescribing Physician',
+  String doctorSpecialty = 'Clinical Prescription',
+  String prescriptionDetail = 'Verified & Stored in Vault',
+}) async {
+  String doc = doctorName;
+  String detail = prescriptionDetail;
+
+  if (prescriptionId != null && prescriptionId.isNotEmpty && ApiService.token != null) {
+    try {
+      final data = await ApiService.getPrescriptionById(prescriptionId);
+      if (data != null) {
+        if (data['doctorName'] != null) doc = data['doctorName'] as String;
+        if (data['status'] != null) {
+          final approvedList = (data['approvedMedicines'] as List?)?.length ?? 0;
+          detail = 'Status: ${data['status']} • $approvedList Approved Medicine(s)';
+        }
+      }
+    } catch (_) {}
+  }
+
+  if (!context.mounted) return;
+
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (sheetContext) => Material(
+      color: Colors.white,
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD8E0E0),
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
-            ),
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                _IconTile(Icons.medical_information_outlined, size: 52),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Dr. Rajesh Sharma, MD',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  const _IconTile(Icons.medical_information_outlined, size: 52),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          doc,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                      Text(
-                        'Diabetologist • Apollo Clinics',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppTheme.textSecondary,
+                        Text(
+                          doctorSpecialty,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.textSecondary,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                IconButton(
-                  onPressed: () => Navigator.pop(sheetContext),
-                  icon: const Icon(Icons.close),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFDFF7FB),
-                borderRadius: BorderRadius.circular(12),
+                  IconButton(
+                    onPressed: () => Navigator.pop(sheetContext),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
               ),
-              child: const Text(
-                'Janumet 50/500mg • 3 Refills remaining',
-                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDFF7FB),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  detail,
+                  style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                ),
               ),
-            ),
             const SizedBox(height: 8),
             ListTile(
               leading: _IconTile(Icons.shopping_bag_outlined),
               title: const Text('Order Prescribed Medicines'),
               subtitle: const Text(
-                'Automated cart loading • Express 22-min delivery',
+                'Automated cart loading • Express delivery available',
               ),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.pop(sheetContext),
@@ -84,7 +108,7 @@ Future<void> showPrescriptionDetailSheet(
             ListTile(
               leading: _IconTile(Icons.history),
               title: const Text('View Refill & Dispense History'),
-              subtitle: const Text('Past 2 fulfillments: 14 Oct & 12 Nov'),
+              subtitle: const Text('Fulfillment log and verification timestamps'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.pop(sheetContext),
             ),
@@ -115,6 +139,7 @@ Future<void> showPrescriptionDetailSheet(
     ),
   ),
 );
+}
 
 class _IconTile extends StatelessWidget {
   final IconData icon;

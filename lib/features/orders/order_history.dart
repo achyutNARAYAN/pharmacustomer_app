@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/theme.dart';
 import '../cart/live_tracking.dart';
 import '../cart/tax_invoice.dart';
+import '../home/search.dart';
+import 'providers/orders_provider.dart';
+import 'repositories/orders_repository.dart';
 
 class OrderHistory extends StatefulWidget {
   const OrderHistory({super.key});
@@ -12,130 +16,183 @@ class OrderHistory extends StatefulWidget {
 
 class _OrderHistoryState extends State<OrderHistory> {
   String filter = 'All';
-  static const orderIds = ['#HRX-982310', '#HRX-881294'];
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: AppTheme.background,
-    appBar: AppBar(
-      centerTitle: true,
-      title: const Text('Order History'),
-      actions: [
-        Padding(
-          padding: const EdgeInsets.only(right: 16),
-          child: Center(
-            child: Text('${orderIds.toSet().length} orders',
-              style: const TextStyle(color: AppTheme.primary, fontWeight: FontWeight.w700, fontSize: 13)),
+  Widget build(BuildContext context) {
+    final ordersProvider = context.watch<OrdersProvider>();
+    final orders = ordersProvider.orders;
+
+    return Scaffold(
+      backgroundColor: AppTheme.background,
+      appBar: AppBar(
+        centerTitle: true,
+        title: const Text('Order History'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Center(
+              child: Text(
+                '${orders.length} orders',
+                style: const TextStyle(
+                  color: AppTheme.primary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
+            ),
           ),
-        ),
-      ],
-    ),
-    body: ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
-      children: [
-        const TextField(
-          textInputAction: TextInputAction.search,
-          decoration: InputDecoration(
-            prefixIcon: Icon(Icons.search, color: AppTheme.primary),
-            hintText: 'Search medicine, order ID, or doctor...',
-            filled: true,
-            fillColor: Colors.white,
-            contentPadding: EdgeInsets.symmetric(vertical: 16),
-            border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(16)), borderSide: BorderSide(color: AppTheme.outlineBorder)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(16)), borderSide: BorderSide(color: AppTheme.outlineBorder)),
-          ),
-        ),
-        const SizedBox(height: 18),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: ['All', 'Delivered', 'Prescription Orders', 'Refills']
-                .map(
-                  (value) => Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ChoiceChip(
-                      label: Text(value),
-                      selected: filter == value,
-                      onSelected: (_) => setState(() => filter = value),
-                      backgroundColor: Colors.white,
-                      selectedColor: Colors.white,
-                      showCheckmark: false,
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                      labelStyle: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: filter == value
-                            ? AppTheme.primary
-                            : AppTheme.textSecondary,
+        ],
+      ),
+      body: orders.isEmpty
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: AppTheme.surfaceLow,
+                        borderRadius: BorderRadius.circular(24),
                       ),
-                      side: BorderSide(
-                        color: filter == value
-                            ? AppTheme.primary
-                            : AppTheme.outlineBorder,
+                      child: const Icon(
+                        Icons.receipt_long_outlined,
+                        size: 40,
+                        color: AppTheme.primary,
                       ),
                     ),
-                  ),
-                )
-                .toList(),
-          ),
-        ),
-        const SizedBox(height: 18),
-        _OrderCard(
-          id: orderIds[0],
-          status: 'Delivered Today · 2:45 PM',
-          total: '₹1,507',
-          items: const [
-            'Insulin Glargine 100IU/ml · 2 Pens',
-            'BD Ultra-Fine Needles 4mm · 1 Pack',
-            'Alcohol Swabs (Sterile) · 1 Box',
-          ],
-          primary: true,
-        ),
-        const SizedBox(height: 16),
-        _OrderCard(
-          id: orderIds[1],
-          status: 'Delivered 12 Aug · Express Delivery',
-          total: '₹340',
-          items: const ['Metformin Hydrochloride 500mg · Strip of 60'],
-        ),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: AppTheme.warningBg.withValues(alpha: 0.58),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppTheme.warningText.withValues(alpha: 0.18)),
-          ),
-          child: const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.autorenew_rounded, color: AppTheme.warningText, size: 20),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Prescription refill scheduled',
+                    const SizedBox(height: 20),
+                    const Text(
+                      'No orders placed yet',
                       style: TextStyle(
-                        color: AppTheme.warningText,
+                        fontSize: 20,
                         fontWeight: FontWeight.bold,
+                        color: AppTheme.text,
                       ),
                     ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'When you place medicine or health orders, they will appear here with live tracking and tax invoices.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppTheme.mutedText, height: 1.4),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute<void>(builder: (_) => const Search()),
+                      ),
+                      icon: const Icon(Icons.shopping_basket_outlined),
+                      label: const Text('Browse Medicines'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+              children: [
+                const TextField(
+                  textInputAction: TextInputAction.search,
+                  decoration: InputDecoration(
+                    prefixIcon: Icon(Icons.search, color: AppTheme.primary),
+                    hintText: 'Search medicine, order ID, or doctor...',
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: EdgeInsets.symmetric(vertical: 16),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(16)),
+                      borderSide: BorderSide(color: AppTheme.outlineBorder),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(16)),
+                      borderSide: BorderSide(color: AppTheme.outlineBorder),
+                    ),
                   ),
-                ],
-              ),
-              SizedBox(height: 8),
-              Text('Rosuvastatin Calcium 10mg · 30 day cycle', style: TextStyle(fontWeight: FontWeight.w600)),
-              Text(
-                'Refills automatically on 28 Aug',
-                style: TextStyle(color: AppTheme.textSecondary),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
+                ),
+                const SizedBox(height: 18),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: ['All', 'Delivered', 'Prescription Orders', 'Refills']
+                        .map(
+                          (value) => Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: ChoiceChip(
+                              label: Text(value),
+                              selected: filter == value,
+                              onSelected: (_) => setState(() => filter = value),
+                              backgroundColor: Colors.white,
+                              selectedColor: Colors.white,
+                              showCheckmark: false,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 8,
+                              ),
+                              labelStyle: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: filter == value
+                                    ? AppTheme.primary
+                                    : AppTheme.textSecondary,
+                              ),
+                              side: BorderSide(
+                                color: filter == value
+                                    ? AppTheme.primary
+                                    : AppTheme.outlineBorder,
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                ...orders.map(
+                  (order) => Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: _OrderCard(
+                      id: '#${order.orderId}',
+                      status: _formatOrderStatus(order.status),
+                      total: '₹${(order.totalPaise / 100).toStringAsFixed(0)}',
+                      items: [
+                        '${order.itemCount} item(s) ordered · Placed ${_formatDate(order.createdAt)}',
+                      ],
+                      primary: order.isActive,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  String _formatOrderStatus(OrderStatus status) {
+    switch (status) {
+      case OrderStatus.placed:
+        return 'Order Placed · Processing';
+      case OrderStatus.confirmed:
+        return 'Confirmed by Pharmacist';
+      case OrderStatus.processing:
+        return 'Packing at Hub';
+      case OrderStatus.outForDelivery:
+        return 'Out for Express Delivery';
+      case OrderStatus.delivered:
+        return 'Delivered Successfully';
+      case OrderStatus.cancelled:
+        return 'Order Cancelled';
+      case OrderStatus.rejected:
+        return 'Order Rejected';
+      case OrderStatus.refunded:
+        return 'Payment Refunded';
+    }
+  }
+
+  String _formatDate(DateTime dt) {
+    return '${dt.day}/${dt.month}/${dt.year}';
+  }
 }
 
 class _OrderCard extends StatelessWidget {

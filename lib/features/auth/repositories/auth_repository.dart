@@ -6,36 +6,7 @@ import '../../../core/storage/key_value_store.dart';
 import '../../../core/storage/secure_token_store.dart';
 import '../models/auth_session.dart';
 
-abstract interface class AuthRemoteDataSource {
-  Future<AuthSession> refresh(String refreshToken);
-  Future<void> logout(String accessToken);
-  Future<AuthSession> verifyOtp(String phone, String otp);
-}
-
-class FakeAuthRemoteDataSource implements AuthRemoteDataSource {
-  @override
-  Future<AuthSession> refresh(String refreshToken) async {
-    return AuthSession(
-      accessToken: 'refreshed_access_${DateTime.now().millisecondsSinceEpoch}',
-      refreshToken: refreshToken,
-      accessExpiresAt: DateTime.now().toUtc().add(const Duration(hours: 1)),
-      userId: 'u_123',
-    );
-  }
-
-  @override
-  Future<void> logout(String accessToken) async {}
-
-  @override
-  Future<AuthSession> verifyOtp(String phone, String otp) async {
-    return AuthSession(
-      accessToken: 'mock_jwt_access_${DateTime.now().millisecondsSinceEpoch}',
-      refreshToken: 'mock_refresh_${DateTime.now().millisecondsSinceEpoch}',
-      accessExpiresAt: DateTime.now().toUtc().add(const Duration(hours: 24)),
-      userId: 'u_123',
-    );
-  }
-}
+import '../../../core/services/api_service.dart';
 
 enum RestoreResultStatus {
   authenticated,
@@ -56,7 +27,6 @@ class AuthRepository {
 
   final SecureTokenStore secureStore;
   final KeyValueStore appSettingsStore;
-  final AuthRemoteDataSource remoteDataSource;
   final AppLogger? logger;
 
   Completer<AuthSession>? _activeRefreshFlight;
@@ -64,7 +34,6 @@ class AuthRepository {
   AuthRepository({
     required this.secureStore,
     required this.appSettingsStore,
-    required this.remoteDataSource,
     this.logger,
   });
 
@@ -110,6 +79,10 @@ class AuthRepository {
 
       // 4. Access token still valid (60s skew) -> authenticated
       if (!session.isExpired) {
+        ApiService.setToken(session.accessToken);
+        if (session.userId.isNotEmpty && session.userId != 'u_customer') {
+          ApiService.setCustomerId(session.userId);
+        }
         return RestoreResult(RestoreResultStatus.authenticated, session);
       }
 
@@ -144,7 +117,13 @@ class AuthRepository {
     _activeRefreshFlight = completer;
 
     try {
-      final newSession = await remoteDataSource.refresh(refreshToken);
+      final newSession = AuthSession(
+        accessToken: refreshToken,
+        refreshToken: refreshToken,
+        accessExpiresAt: DateTime.now().toUtc().add(const Duration(days: 30)),
+        userId: 'u_customer',
+      );
+      ApiService.setToken(newSession.accessToken);
       await saveSession(newSession);
       completer.complete(newSession);
       return newSession;
@@ -157,11 +136,13 @@ class AuthRepository {
   }
 
   Future<void> saveSession(AuthSession session) async {
+    ApiService.setToken(session.accessToken);
     final encoded = jsonEncode(session.toJson());
     await secureStore.write(sessionKey, encoded);
   }
 
   Future<void> clearSession() async {
+    ApiService.setToken(null);
     await secureStore.delete(sessionKey);
   }
 }

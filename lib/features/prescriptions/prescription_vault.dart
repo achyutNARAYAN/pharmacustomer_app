@@ -1,9 +1,13 @@
-import 'package:flutter/material.dart';
+ import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/services/api_service.dart';
 import '../../core/theme.dart';
 import '../home/search.dart';
 import 'prescription_review.dart';
 import 'prescription_upload_sheet.dart';
+import 'providers/prescription_provider.dart';
+import 'repositories/prescription_repository.dart';
 import 'widgets/prescription_progress_step.dart';
 import 'widgets/prescription_detail_sheet.dart';
 import 'widgets/prescription_refill_sheet.dart';
@@ -30,10 +34,6 @@ class PrescriptionVault extends StatefulWidget {
 
 class _PrescriptionVaultState extends State<PrescriptionVault> {
   int _tab = 0;
-  bool _hasUnderReviewPrescription = false;
-  bool _hasActivePrescription = false;
-  bool _hasArchivedPrescription = true;
-  bool _firstArchiveVisible = true;
 
   void _handleBack() {
     if (widget.onBack != null) {
@@ -43,8 +43,41 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
     }
   }
 
+  String _formatDate(DateTime dt) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final rxProvider = context.watch<PrescriptionProvider?>();
+    final allPrescriptions = rxProvider?.prescriptions ?? [];
+    final activeList = allPrescriptions
+        .where(
+          (p) =>
+              p.status == PrescriptionStatus.approved ||
+              p.status == PrescriptionStatus.uploaded,
+        )
+        .toList();
+    final underReviewList = allPrescriptions
+        .where(
+          (p) =>
+              p.status == PrescriptionStatus.underReview ||
+              p.status == PrescriptionStatus.queued ||
+              p.status == PrescriptionStatus.uploading,
+        )
+        .toList();
+    final archivedList = allPrescriptions
+        .where(
+          (p) =>
+              p.status == PrescriptionStatus.expired ||
+              p.status == PrescriptionStatus.rejected,
+        )
+        .toList();
+
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
@@ -64,30 +97,36 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
       ),
       body: Column(
         children: [
-          _tabs(),
+          _tabs(
+            activeCount: activeList.length,
+            reviewCount: underReviewList.length,
+            archivedCount: archivedList.length,
+          ),
           Expanded(
             child: _tab == 0
-                ? _hasActivePrescription
-                      ? _activeView()
-                      : _emptyView()
+                ? (activeList.isNotEmpty ? _activeView(activeList) : _emptyView())
                 : _tab == 1
-                ? _underReviewView()
-                : _archivedView(),
+                ? _underReviewView(underReviewList)
+                : _archivedView(archivedList),
           ),
         ],
       ),
     );
   }
 
-  Widget _tabs() => SizedBox(
+  Widget _tabs({
+    required int activeCount,
+    required int reviewCount,
+    required int archivedCount,
+  }) => SizedBox(
     height: 64,
     child: ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
       scrollDirection: Axis.horizontal,
       children: [
-        _tabChip(0, 'Active Prescriptions', _hasActivePrescription ? '3' : '0'),
-        _tabChip(1, 'Under Review', _hasUnderReviewPrescription ? '1' : '0'),
-        _tabChip(2, 'Past & Expired', _hasArchivedPrescription ? '2' : '0'),
+        _tabChip(0, 'Active Prescriptions', '$activeCount'),
+        _tabChip(1, 'Under Review', '$reviewCount'),
+        _tabChip(2, 'Past & Expired', '$archivedCount'),
       ],
     ),
   );
@@ -115,20 +154,24 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
     );
   }
 
-  Widget _activeView() => ListView(
+  Widget _activeView(List<Prescription> list) => ListView(
     padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
     children: [
-      _prescriptionCard(
-        name: 'Dr. Rajiv Mehta',
-        subtitle: 'Cardiologist • Max Hospital',
-        date: 'Prescribed 12 Aug 2026',
-        status: 'Verified & Active',
-        medicines: const [
-          ('Metformin', '500mg • Daily'),
-          ('Telmisartan', '40mg • Morning'),
-        ],
+      ...list.map(
+        (p) => Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: _prescriptionCard(
+            name: p.doctorName ?? 'Consulting Physician',
+            subtitle: 'Prescription #${p.id.length > 8 ? p.id.substring(0, 8) : p.id}',
+            date: 'Added ${_formatDate(p.createdAt)}',
+            status: p.status.chipLabel,
+            medicines: [
+              (p.fileName, '${(p.sizeBytes / 1024).toStringAsFixed(1)} KB • Digital Rx'),
+            ],
+          ),
+        ),
       ),
-      const SizedBox(height: 20),
+      const SizedBox(height: 12),
       _uploadPanel(),
     ],
   );
@@ -242,8 +285,40 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
       ),
     );
     if (submitted == true && mounted) {
+      String rxId = 'rx_${DateTime.now().millisecondsSinceEpoch}';
+      try {
+        if (ApiService.token != null) {
+          final res = await ApiService.uploadPrescription(
+            customerId: (widget.patientId != null && widget.patientId!.isNotEmpty) ? widget.patientId! : ApiService.currentCustomerId,
+            patientName: widget.patientName.isNotEmpty ? widget.patientName : 'Customer',
+            prescriptionDate: DateTime.now(),
+            documentUrl: file.path ?? 'https://res.cloudinary.com/demo/sample_rx.pdf',
+            fileSize: file.size,
+            mimeType: file.extension == 'pdf' ? 'application/pdf' : 'image/jpeg',
+          );
+          if (res != null && res['prescriptionId'] != null) {
+            rxId = res['prescriptionId'] as String;
+          }
+        }
+      } catch (_) {}
+
+      if (!mounted) return;
+      final rxProvider = context.read<PrescriptionProvider?>();
+      if (rxProvider != null) {
+        rxProvider.addPrescription(
+          Prescription(
+            id: rxId,
+            source: 'upload',
+            status: PrescriptionStatus.underReview,
+            fileName: file.name,
+            mime: file.extension ?? 'image/jpeg',
+            sizeBytes: file.size,
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          ),
+        );
+      }
       setState(() {
-        _hasUnderReviewPrescription = true;
         _tab = 1;
       });
     }
@@ -422,50 +497,94 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
     ),
   );
 
-  Widget _archivedView() => ListView(
-    padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-    children: [
-      Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  Widget _archivedView(List<Prescription> list) {
+    if (list.isEmpty) {
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
         children: [
-          const Text(
-            'Past prescriptions',
-            style: TextStyle(
-              fontSize: 17,
-              color: AppTheme.text,
-              fontWeight: FontWeight.w700,
+          Container(
+            padding: const EdgeInsets.fromLTRB(22, 28, 22, 24),
+            decoration: _cardDecoration(),
+            child: Column(
+              children: [
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceLow,
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                  child: const Icon(
+                    Icons.history_edu_outlined,
+                    color: AppTheme.textSecondary,
+                    size: 34,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  'No expired prescriptions',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.text,
+                  ),
+                ),
+                const SizedBox(height: 7),
+                const Text(
+                  'Past or expired prescriptions will appear here for your medical records.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.45,
+                    color: AppTheme.mutedText,
+                  ),
+                ),
+              ],
             ),
           ),
-          _pill(
-            '${_firstArchiveVisible ? 2 : 1} records',
-            Colors.white,
-            AppTheme.textSecondary,
-          ),
         ],
-      ),
-      const SizedBox(height: 14),
-      if (_firstArchiveVisible) ...[
-        _archiveCard(
-          'Dr. Rajiv Mehta, MD',
-          'Senior Endocrinologist • Max Healthcare',
-          'Expired on 12 Nov 2024',
-          'Janumet 50mg/500mg, Glimepiride 2mg',
-          '3 of 3 Refills Completed • Validity lapsed (6 Months)',
-          Colors.red,
-          first: true,
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Past prescriptions',
+              style: TextStyle(
+                fontSize: 17,
+                color: AppTheme.text,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            _pill(
+              '${list.length} records',
+              Colors.white,
+              AppTheme.textSecondary,
+            ),
+          ],
         ),
         const SizedBox(height: 14),
+        ...list.map(
+          (p) => Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: _archiveCard(
+              p.doctorName ?? 'Consulting Physician',
+              'Prescription #${p.id.length > 8 ? p.id.substring(0, 8) : p.id}',
+              'Expired on ${_formatDate(p.createdAt)}',
+              p.fileName,
+              'Archived prescription record',
+              Colors.orange,
+            ),
+          ),
+        ),
       ],
-      _archiveCard(
-        'Dr. Sunita Rao, MBBS, DNB',
-        'Cardiologist • Fortis Escorts Hospital',
-        'Expired on 04 Jan 2025',
-        'Rosuvas 10mg (Rosuvastatin), Telma 40mg',
-        'Maintenance dosage complete • Fresh evaluation recommended',
-        Colors.orange,
-      ),
-    ],
-  );
+    );
+  }
 
   Widget _archiveCard(
     String name,
@@ -618,9 +737,6 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
                   Expanded(
                     child: TextButton.icon(
                       onPressed: () => setState(() {
-                        _hasActivePrescription = true;
-                        _firstArchiveVisible = false;
-                        _hasArchivedPrescription = true;
                         _tab = 0;
                       }),
                       icon: const Icon(Icons.unarchive_outlined, size: 18),
@@ -655,8 +771,8 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
     ),
   );
 
-  Widget _underReviewView() {
-    if (!_hasUnderReviewPrescription) {
+  Widget _underReviewView(List<Prescription> list) {
+    if (list.isEmpty) {
       return ListView(
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
         children: [
@@ -717,91 +833,98 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       children: [
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: _cardDecoration(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Prescription submitted',
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.text,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Uploaded just now · 1 page',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppTheme.mutedText,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  _pill('IN REVIEW', AppTheme.infoBg, AppTheme.infoText),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 11,
-                ),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryContainer.withValues(alpha: .65),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Row(
+        ...list.map(
+          (p) => Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.all(18),
+            decoration: _cardDecoration(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Icon(
-                      Icons.schedule_rounded,
-                      size: 18,
-                      color: AppTheme.primary,
-                    ),
-                    SizedBox(width: 8),
                     Expanded(
-                      child: Text(
-                        'Most reviews are completed within 30–45 minutes',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppTheme.textSecondary,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Prescription submitted',
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.text,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${p.fileName} · ${_formatDate(p.createdAt)}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.mutedText,
+                            ),
+                          ),
+                        ],
                       ),
+                    ),
+                    _pill(
+                      p.status.chipLabel.toUpperCase(),
+                      AppTheme.infoBg,
+                      AppTheme.infoText,
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 22),
-              const PrescriptionProgressStep(
-                icon: Icons.check_rounded,
-                title: 'Prescription uploaded',
-                done: true,
-              ),
-              const PrescriptionProgressStep(
-                icon: Icons.medical_information_outlined,
-                title: 'Pharmacist review',
-                active: true,
-              ),
-              const PrescriptionProgressStep(
-                icon: Icons.shopping_bag_outlined,
-                title: 'Medicines added to cart',
-              ),
-              const PrescriptionProgressStep(
-                icon: Icons.credit_card_outlined,
-                title: 'Ready for payment',
-              ),
-            ],
+                const SizedBox(height: 14),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 11,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryContainer.withValues(alpha: .65),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(
+                        Icons.schedule_rounded,
+                        size: 18,
+                        color: AppTheme.primary,
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Most reviews are completed within 30–45 minutes',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 22),
+                const PrescriptionProgressStep(
+                  icon: Icons.check_rounded,
+                  title: 'Prescription uploaded',
+                  done: true,
+                ),
+                const PrescriptionProgressStep(
+                  icon: Icons.medical_information_outlined,
+                  title: 'Pharmacist review',
+                  active: true,
+                ),
+                const PrescriptionProgressStep(
+                  icon: Icons.shopping_bag_outlined,
+                  title: 'Medicines added to cart',
+                ),
+                const PrescriptionProgressStep(
+                  icon: Icons.credit_card_outlined,
+                  title: 'Ready for payment',
+                ),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 16),
@@ -863,12 +986,10 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
     ),
   );
 
-  void _showDocument() => showPrescriptionDetailSheet(
+  void _showDocument([String? rxId]) => showPrescriptionDetailSheet(
     context,
+    prescriptionId: rxId,
     onArchive: () => setState(() {
-      _hasActivePrescription = false;
-      _hasArchivedPrescription = true;
-      _firstArchiveVisible = true;
       _tab = 2;
     }),
   );

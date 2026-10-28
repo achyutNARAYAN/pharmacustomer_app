@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
-import '../../core/models/mock_medicines.dart';
+import '../../core/models/medicine_model.dart';
 import '../../core/widgets/section_header.dart';
 import '../medicine/medicine_detail.dart';
 import 'cgm_sub_category.dart';
@@ -49,7 +49,23 @@ class _CategoryDetailState extends State<CategoryDetail>
   }
 
   void _openMedicineDetail() {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => MedicineDetail(medicine: janumet)));
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const MedicineDetail(
+          medicine: Medicine(
+            name: 'Janumet 50mg/500mg Tablet',
+            description: 'Sitagliptin (50mg) + Metformin HCl (500mg)',
+            price: '485.00',
+            mrp: '550.00',
+            discount: '12% OFF',
+            badge: 'Prescription Required',
+            requiresPrescription: true,
+            tag: 'Strip of 15 tablets',
+          ),
+        ),
+      ),
+    );
   }
 
   void _openCgmScreen() {
@@ -291,14 +307,14 @@ class _OralMedicationsTab extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         MedicineListCard(
-          name: janumet.name,
-          description: janumet.description,
-          price: '₹${janumet.price}',
-          mrp: '₹${janumet.mrp}',
-          discount: janumet.discount,
-          badge: janumet.badge,
-          requiresPrescription: janumet.requiresPrescription,
-          tag: janumet.tag,
+          name: 'Janumet 50mg/500mg Tablet',
+          description: 'Sitagliptin (50mg) + Metformin HCl (500mg)',
+          price: '₹485.00',
+          mrp: '₹550.00',
+          discount: '12% OFF',
+          badge: 'Rx required',
+          requiresPrescription: true,
+          tag: 'Strip of 15 tablets',
           onTap: onMedicineTap,
         ),
       ],

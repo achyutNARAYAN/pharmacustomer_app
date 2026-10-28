@@ -63,11 +63,11 @@ class PrescriptionClarification extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Dr. Arjun Verma',
+                'Registered Reviewing Pharmacist',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               Text(
-                'Lead Pharmacist (Reg #PH-44910)',
+                'Clinical Quality Assurance Lead',
                 style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
               ),
               Divider(height: 24),

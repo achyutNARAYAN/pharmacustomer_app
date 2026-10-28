@@ -22,7 +22,6 @@ void main() {
       authRepo = AuthRepository(
         secureStore: secureStore,
         appSettingsStore: appSettingsStore,
-        remoteDataSource: FakeAuthRemoteDataSource(),
       );
 
       authProvider = AuthProvider(authRepo, userDataRegistry: registry);

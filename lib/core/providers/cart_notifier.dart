@@ -163,7 +163,7 @@ class CartNotifier extends ChangeNotifier implements PersistedProvider {
     // Network refresh if remote cart endpoint is available
     if (_repository != null && _userId != null) {
       try {
-        final serverCart = await _repository.remoteDataSource.getCart(_userId!);
+        final serverCart = await _repository.fetchRemoteCart();
         if (serverCart != null) {
           _items.clear();
           for (final item in serverCart.lines) {

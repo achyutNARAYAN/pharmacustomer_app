@@ -1,13 +1,20 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/theme.dart';
+import '../../core/services/api_service.dart';
+import '../../core/providers/profile_notifier.dart';
+import 'models/auth_session.dart';
+import 'providers/auth_provider.dart';
+import '../home/main_nav_wrapper.dart';
 import '../onboarding/profile_setup.dart';
 
 class Otp extends StatefulWidget {
   final String? phoneNumber;
-  const Otp({super.key, this.phoneNumber});
+  final int initialCooldown;
+  const Otp({super.key, this.phoneNumber, this.initialCooldown = 60});
 
   @override
   State<Otp> createState() => _OtpState();
@@ -17,21 +24,19 @@ class _OtpState extends State<Otp> {
   final TextEditingController _otpController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
   bool hasError = false;
-  int _secondsLeft = 48;
+  bool _isVerifying = false;
+  int _secondsLeft = 60;
   Timer? _timer;
-
-  // ponytail: demo default valid OTP is '123456'
-  static const String _validOtp = '123456';
 
   @override
   void initState() {
     super.initState();
-    _startTimer();
+    _startTimer(widget.initialCooldown);
   }
 
-  void _startTimer() {
+  void _startTimer([int? seconds]) {
     _timer?.cancel();
-    setState(() => _secondsLeft = 48);
+    setState(() => _secondsLeft = seconds ?? widget.initialCooldown);
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_secondsLeft > 0) {
         setState(() => _secondsLeft--);
@@ -41,25 +46,118 @@ class _OtpState extends State<Otp> {
     });
   }
 
-  void _resendOtp() {
+  Future<void> _resendOtp() async {
     if (_secondsLeft == 0) {
-      _startTimer();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('New OTP sent to your number')),
-      );
+      final phone = widget.phoneNumber ?? '';
+      if (phone.isNotEmpty) {
+        try {
+          final res = await ApiService.sendOtp(phone);
+          final cooldown = (res['cooldownSeconds'] as num?)?.toInt() ?? 60;
+          _startTimer(cooldown);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('New OTP sent to your number')),
+          );
+        } catch (e) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(e.toString().replaceAll('ValidationFailure: ', '').replaceAll('NetworkFailure: ', ''))),
+          );
+        }
+      }
     }
   }
 
-  void _verifyOtp() {
+  Future<void> _verifyOtp() async {
     final code = _otpController.text.trim();
-    if (code == _validOtp) {
-      setState(() => hasError = false);
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => ProfileSetup(phoneNumber: widget.phoneNumber ?? '')),
-      );
-    } else {
+    if (code.length != 6) return;
+
+    final phone = widget.phoneNumber ?? '9876543210';
+    setState(() {
+      _isVerifying = true;
+      hasError = false;
+    });
+
+    try {
+      final res = await ApiService.verifyOtp(phone, code);
+      if (!mounted) return;
+      
+      final isNewUser = res['isNewUser'] as bool?;
+      final isRegisteredFlag = res['isRegistered'] as bool?;
+      final token = res['token'] as String? ?? '';
+      final cust = res['customer'] as Map<String, dynamic>?;
+      final rawMongoId = cust?['_id'] as String? ?? cust?['id'] as String? ?? cust?['customerId'] as String? ?? 'u_customer';
+      final customerId = rawMongoId;
+      if (customerId.isNotEmpty && customerId != 'u_customer') {
+        ApiService.setCustomerId(customerId);
+      }
+      final name = cust?['fullName'] as String? ?? 'User';
+      final hasCompletedName = cust != null &&
+          (cust['fullName'] as String?)?.trim().isNotEmpty == true &&
+          cust['fullName'] != 'User';
+
+      final isRegistered = (isRegisteredFlag == true) ||
+          (isNewUser == false) ||
+          hasCompletedName;
+
+      // Persist auth session if token is provided
+      if (token.isNotEmpty) {
+        final session = AuthSession(
+          accessToken: token,
+          refreshToken: token,
+          accessExpiresAt: DateTime.now().toUtc().add(const Duration(days: 30)),
+          userId: customerId,
+        );
+        await context.read<AuthProvider>().onOtpSuccess(session);
+      }
+
+      // Update ProfileNotifier with verified customer data
+      if (mounted) {
+        final profile = context.read<ProfileNotifier>();
+        if (cust != null) {
+          profile.setName(name);
+          profile.setPhone(cust['mobileNumber'] as String? ?? phone);
+          if (cust['email'] != null) profile.setEmail(cust['email'] as String);
+          if (cust['addresses'] is List && (cust['addresses'] as List).isNotEmpty) {
+            final firstAddr = (cust['addresses'] as List).first as Map<String, dynamic>?;
+            if (firstAddr != null) {
+              final line1 = firstAddr['addressLine1'] ?? '';
+              final city = firstAddr['city'] ?? '';
+              final fullAddr = [line1, city].where((s) => s.toString().isNotEmpty).join(', ');
+              if (fullAddr.isNotEmpty) profile.setAddress(fullAddr);
+            }
+          }
+        } else {
+          profile.setPhone(phone);
+        }
+        setState(() => hasError = false);
+
+        if (isRegistered) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(
+              builder: (context) => MainNavWrapper(
+                name: name,
+                phoneNumber: phone,
+              ),
+            ),
+            (route) => false,
+          );
+        } else {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => ProfileSetup(phoneNumber: phone)),
+          );
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
       setState(() => hasError = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceAll('ValidationFailure: ', '').replaceAll('NetworkFailure: ', ''))),
+      );
+    } finally {
+      if (mounted) setState(() => _isVerifying = false);
     }
   }
 
@@ -280,15 +378,21 @@ class _OtpState extends State<Otp> {
                 ),
               const SizedBox(height: 32),
               ElevatedButton(
-                onPressed: _verifyOtp,
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text('Verify & Continue'),
-                    SizedBox(width: 8),
-                    Icon(Icons.arrow_forward, size: 18),
-                  ],
-                ),
+                onPressed: _isVerifying ? null : _verifyOtp,
+                child: _isVerifying
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text('Verify & Continue'),
+                          SizedBox(width: 8),
+                          Icon(Icons.arrow_forward, size: 18),
+                        ],
+                      ),
               ),
             ],
           ),

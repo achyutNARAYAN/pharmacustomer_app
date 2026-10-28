@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/providers/cart_notifier.dart';
+import '../../core/providers/profile_notifier.dart';
 import '../../core/theme.dart';
 import 'payment.dart';
 
@@ -13,7 +14,12 @@ class DeliveryOptions extends StatefulWidget {
 class _DeliveryOptionsState extends State<DeliveryOptions> {
   int selected = 0;
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) {
+    final profile = context.watch<ProfileNotifier>();
+    final deliveryAddress = profile.address.isNotEmpty ? profile.address : 'Saved primary address';
+    final deliveryArea = profile.address.isNotEmpty ? 'Verified delivery location' : 'Default delivery destination';
+
+    return Scaffold(
     backgroundColor: AppTheme.background,
     appBar: AppBar(
       title: const Text('Delivery Options'),
@@ -56,12 +62,12 @@ class _DeliveryOptionsState extends State<DeliveryOptions> {
                 child: const Icon(Icons.location_on, color: AppTheme.primary),
               ),
               const SizedBox(width: 14),
-              const Expanded(child: Column(
+              Expanded(child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Delivering to: Flat 402, Bellandur', style: TextStyle(fontWeight: FontWeight.bold)),
-                  SizedBox(height: 4),
-                  Text('Green Glen Layout · Bengaluru 560103', style: TextStyle(color: AppTheme.mutedText)),
+                  Text('Delivering to: $deliveryAddress', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Text(deliveryArea, style: const TextStyle(color: AppTheme.mutedText)),
                 ],
               )),
             ],
@@ -147,7 +153,7 @@ class _DeliveryOptionsState extends State<DeliveryOptions> {
                                 if (entry.key == 0) ...[
                                   const Divider(height: 20),
                                   const Text(
-                                    'Fastest option · Bellandur Hub (1.8 km)',
+                                    'Fastest option · Dispatched from nearest verified fulfillment center',
                                     style: TextStyle(
                                       fontSize: 13,
                                       color: AppTheme.mutedText,
@@ -284,3 +290,5 @@ class _DeliveryOptionsState extends State<DeliveryOptions> {
     ),
   );
 }
+}
+

@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/providers/cart_notifier.dart';
-import '../../core/models/mock_medicines.dart';
+import '../../core/models/medicine_model.dart';
 import '../../core/models/cart_item.dart';
 import '../cart/cart.dart';
 import '../../core/theme.dart';
 import '../../core/utils/prescription_uploader.dart';
 import '../../core/constants/app_strings.dart';
+import '../../core/services/api_service.dart';
 import '../category/category_detail.dart';
 import '../medicine/medicine_detail.dart';
 
@@ -22,7 +23,30 @@ class Search extends StatefulWidget {
 class _SearchState extends State<Search> {
   final TextEditingController _searchController = TextEditingController();
   bool _filterColdChain = false;
-  int _itemCount = 1;
+  List<Medicine> _liveMedicines = [];
+  bool _isSearching = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchLiveMedicines('');
+  }
+
+  Future<void> _fetchLiveMedicines(String query) async {
+    setState(() => _isSearching = true);
+    try {
+      final items = await ApiService.searchMedicines(search: query.isNotEmpty ? query : null);
+      if (items.isNotEmpty && mounted) {
+        setState(() {
+          _liveMedicines = items.map((m) => Medicine.fromJson(m)).toList();
+        });
+      }
+    } catch (_) {
+      // Fallback gracefully to default items if offline
+    } finally {
+      if (mounted) setState(() => _isSearching = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -53,7 +77,10 @@ class _SearchState extends State<Search> {
           ),
           child: TextField(
             controller: _searchController,
-            onChanged: (val) => setState(() {}),
+            onChanged: (val) {
+              setState(() {});
+              _fetchLiveMedicines(val.trim());
+            },
             decoration: InputDecoration(
               hintText: AppStrings.searchHint,
               prefixIcon: const Icon(
@@ -124,18 +151,25 @@ class _SearchState extends State<Search> {
     );
   }
 
-  // ── View routing ──────────────────────────────────────────────────────────
-
   Widget _buildBody(String query) {
-    if (query.toLowerCase() == 'pirfenidone 800mg') {
-      return _buildNotFoundView();
-    } else if (query.toLowerCase() == 'diabetes care' ||
-        query.toLowerCase() == 'metformin') {
-      return _filterColdChain
-          ? _buildNoFilterMatchView()
-          : _buildSearchResultsView();
+    if (query.isEmpty) {
+      return _buildBrowseCategoriesView();
     }
-    return _buildBrowseCategoriesView();
+    if (_isSearching) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+    if (_filterColdChain) {
+      return _buildNoFilterMatchView();
+    }
+    if (_liveMedicines.isEmpty) {
+      return _buildNotFoundView();
+    }
+    return _buildSearchResultsView(query);
   }
 
   // ── Browse categories ─────────────────────────────────────────────────────
@@ -384,9 +418,7 @@ class _SearchState extends State<Search> {
     );
   }
 
-  // ── Search results ────────────────────────────────────────────────────────
-
-  Widget _buildSearchResultsView() {
+  Widget _buildSearchResultsView(String query) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -395,27 +427,27 @@ class _SearchState extends State<Search> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Showing 48 medicines for',
-                      style: TextStyle(
+                      'Showing ${_liveMedicines.length} medicines for',
+                      style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                         color: AppTheme.text,
                       ),
                     ),
                     Text(
-                      'Diabetes Care',
-                      style: TextStyle(
+                      query,
+                      style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 18,
                         color: AppTheme.text,
                       ),
                     ),
-                    Text(
+                    const Text(
                       'Verified authentic supplies from certified pharmacies',
                       style: TextStyle(color: Colors.grey, fontSize: 11),
                       overflow: TextOverflow.ellipsis,
@@ -446,95 +478,30 @@ class _SearchState extends State<Search> {
             ],
           ),
           const SizedBox(height: 16),
-          _buildMedicineCard(
-            medicineIndex: 1,
-            name: 'Glycomet 500mg SR T...',
-            desc: '10 Tablets • USV Ltd\nContains Metformin (500mg)',
-            price: '₹24.50',
-            mrp: '₹28.00',
-            discount: '12% OFF',
-            badge: 'Req Required',
-            isCounter: true,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) =>
-                    MedicineDetail(medicine: mockMedicines[1]),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          _buildMedicineCard(
-            medicineIndex: 2,
-            name: 'Januvia 100mg Tablet',
-            desc: '7 Tablets • MSD\nSitagliptin phosphate oral formulation',
-            price: '₹310.00',
-            mrp: '₹345.00',
-            discount: '10% OFF',
-            badge: 'Req Required',
-            footer: 'Standard delivery by tomorrow',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) =>
-                    MedicineDetail(medicine: mockMedicines[2]),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          _buildMedicineCard(
-            medicineIndex: 3,
-            name: 'Accu-Chek Active Test...',
-            desc: '50 Strips • Roche\nBlood glucose self-monitoring strips',
-            price: '₹925.00',
-            mrp: '₹1050.00',
-            discount: '12% OFF',
-            badge: 'OTC - No Rx needed',
-            footer: '⚡ In Stock - 22 min delivery',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) =>
-                    MedicineDetail(medicine: mockMedicines[3]),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          _buildMedicineCard(
-            medicineIndex: 4,
-            name: 'Glucerna Diabetes Car...',
-            desc:
-                'Vanilla 400g • Abbott Nutrition\nSlow-release carbohydrate blend',
-            price: '₹680.00',
-            mrp: '₹750.00',
-            discount: '9% OFF',
-            badge: 'OTC',
-            footer: 'Only 3 units left',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) =>
-                    MedicineDetail(medicine: mockMedicines[4]),
-              ),
-            ),
-          ),
+          ..._liveMedicines.map((med) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _buildMedicineCard(
+                  medicine: med,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => MedicineDetail(medicine: med),
+                    ),
+                  ),
+                ),
+              )),
         ],
       ),
     );
   }
 
   Widget _buildMedicineCard({
-    required int medicineIndex,
-    required String name,
-    required String desc,
-    required String price,
-    required String mrp,
-    required String discount,
-    required String badge,
-    bool isCounter = false,
+    required Medicine medicine,
     String? footer,
     VoidCallback? onTap,
   }) {
+    final parsedPrice =
+        double.tryParse(medicine.price.replaceAll('₹', '').trim()) ?? 0.0;
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -574,21 +541,29 @@ class _SearchState extends State<Search> {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.red.shade50,
+                          color: medicine.requiresPrescription
+                              ? Colors.red.shade50
+                              : Colors.green.shade50,
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          badge,
+                          medicine.badge.isNotEmpty
+                              ? medicine.badge
+                              : (medicine.requiresPrescription
+                                  ? 'Rx Required'
+                                  : 'OTC'),
                           style: TextStyle(
                             fontSize: 10,
-                            color: Colors.red.shade700,
+                            color: medicine.requiresPrescription
+                                ? Colors.red.shade700
+                                : Colors.green.shade700,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        name,
+                        medicine.name,
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
@@ -596,7 +571,7 @@ class _SearchState extends State<Search> {
                         ),
                       ),
                       Text(
-                        desc,
+                        medicine.description,
                         style: const TextStyle(
                           color: Colors.grey,
                           fontSize: 11,
@@ -614,95 +589,66 @@ class _SearchState extends State<Search> {
                 Row(
                   children: [
                     Text(
-                      price,
+                      medicine.price.startsWith('₹')
+                          ? medicine.price
+                          : '₹${medicine.price}',
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                         color: AppTheme.text,
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    Text(
-                      mrp,
-                      style: const TextStyle(
-                        decoration: TextDecoration.lineThrough,
-                        color: Colors.grey,
-                        fontSize: 12,
+                    if (medicine.mrp.isNotEmpty) ...[
+                      const SizedBox(width: 6),
+                      Text(
+                        medicine.mrp.startsWith('₹')
+                            ? medicine.mrp
+                            : '₹${medicine.mrp}',
+                        style: const TextStyle(
+                          decoration: TextDecoration.lineThrough,
+                          color: Colors.grey,
+                          fontSize: 12,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      discount,
-                      style: const TextStyle(
-                        color: Colors.green,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
+                    ],
+                    if (medicine.discount.isNotEmpty) ...[
+                      const SizedBox(width: 6),
+                      Text(
+                        medicine.discount,
+                        style: const TextStyle(
+                          color: Colors.green,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
-                if (isCounter)
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.teal.shade50,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(
-                            Icons.remove,
-                            size: 16,
-                            color: AppTheme.primary,
-                          ),
-                          onPressed: () {
-                            if (_itemCount > 0) setState(() => _itemCount--);
-                          },
-                        ),
-                        Text(
-                          '$_itemCount',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.primary,
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.add,
-                            size: 16,
-                            color: AppTheme.primary,
-                          ),
-                          onPressed: () {
-                            if (_itemCount < 10) setState(() => _itemCount++);
-                          },
-                        ),
-                      ],
-                    ),
-                  )
-                else
-                  ElevatedButton(
-                    onPressed: () => context.read<CartNotifier>().add(
-                      CartItem(
-                        id: 'search_$name',
-                        name: name,
-                        pack: desc.split('\n').first,
-                        price: double.parse(price.replaceAll('₹', '')),
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.teal.shade50,
-                      foregroundColor: AppTheme.primary,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      minimumSize: const Size(80, 36),
-                    ),
-                    child: const Text(
-                      '+ Add',
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                ElevatedButton(
+                  onPressed: () => context.read<CartNotifier>().add(
+                    CartItem(
+                      id: medicine.id ??
+                          medicine.medicineCode ??
+                          'search_${medicine.name}',
+                      name: medicine.name,
+                      pack: medicine.tag ?? '1 Unit',
+                      price: parsedPrice,
                     ),
                   ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.teal.shade50,
+                    foregroundColor: AppTheme.primary,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    minimumSize: const Size(80, 36),
+                  ),
+                  child: const Text(
+                    '+ Add',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
               ],
             ),
             if (footer != null) ...[
@@ -714,8 +660,8 @@ class _SearchState extends State<Search> {
             ],
           ],
         ),
-      ), // Container
-    ); // GestureDetector
+      ),
+    );
   }
 
   // ── Not found ─────────────────────────────────────────────────────────────
@@ -1025,7 +971,19 @@ class _SearchState extends State<Search> {
             OutlinedButton(
               onPressed: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const MedicineDetail()),
+                MaterialPageRoute(
+                  builder: (_) => MedicineDetail(
+                    medicine: Medicine(
+                      name: name,
+                      description: desc,
+                      price: price.replaceAll('₹', ''),
+                      mrp: price.replaceAll('₹', ''),
+                      discount: '',
+                      badge: tag,
+                      requiresPrescription: tag.toLowerCase().contains('rx'),
+                    ),
+                  ),
+                ),
               ),
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: AppTheme.primary),

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import '../services/api_service.dart';
 import '../../features/profile/repositories/profile_repository.dart';
 import 'load_status.dart';
 
@@ -11,8 +12,8 @@ class ProfileNotifier extends ChangeNotifier implements PersistedProvider {
   String phoneNumber = '';
   String email = '';
   String address = '';
-  String workAddress = 'Tower 4, Ecospace Business Park, Outer Ring Rd, Bellandur, Bengaluru 560103';
-  String parentsAddress = '12th Main, Indiranagar, Bengaluru 560038';
+  String workAddress = '';
+  String parentsAddress = '';
   String? profileImagePath;
 
   LoadStatus _status = LoadStatus.uninitialized;
@@ -102,6 +103,35 @@ class ProfileNotifier extends ChangeNotifier implements PersistedProvider {
     );
     _schedulePersist();
     _safeNotify();
+
+    if (ApiService.token != null) {
+      final custId = _userId.isNotEmpty ? _userId : ApiService.currentCustomerId;
+      ApiService.updateCustomerProfile(custId, fullName: name, email: email).catchError((_) {});
+    }
+  }
+
+  void setName(String val) {
+    name = val;
+    _schedulePersist();
+    _safeNotify();
+  }
+
+  void setPhone(String val) {
+    phoneNumber = val;
+    _schedulePersist();
+    _safeNotify();
+  }
+
+  void setEmail(String val) {
+    email = val;
+    _schedulePersist();
+    _safeNotify();
+  }
+
+  void setAddress(String val) {
+    address = val;
+    _schedulePersist();
+    _safeNotify();
   }
 
   void updateAddress(String label, String value) {
@@ -126,6 +156,29 @@ class ProfileNotifier extends ChangeNotifier implements PersistedProvider {
     if (profile != null) {
       _applyProfile(profile);
     }
+
+    try {
+      if (ApiService.token != null) {
+        final remote = await ApiService.getCustomerProfile(_userId);
+        if (remote != null) {
+          final remoteName = remote['fullName'] as String?;
+          final remoteEmail = remote['email'] as String?;
+          final remotePhone = remote['mobileNumber'] as String?;
+          if (remoteName != null && remoteName.isNotEmpty) name = remoteName;
+          if (remoteEmail != null && remoteEmail.isNotEmpty) email = remoteEmail;
+          if (remotePhone != null && remotePhone.isNotEmpty) phoneNumber = remotePhone;
+          if (remote['addresses'] is List && (remote['addresses'] as List).isNotEmpty) {
+            final first = (remote['addresses'] as List).first as Map<String, dynamic>?;
+            if (first != null && address.isEmpty) {
+              final line1 = first['addressLine1'] ?? '';
+              final city = first['city'] ?? '';
+              address = [line1, city].where((s) => s.toString().isNotEmpty).join(', ');
+            }
+          }
+          _schedulePersist();
+        }
+      }
+    } catch (_) {}
     _status = LoadStatus.ready;
     _safeNotify();
   }

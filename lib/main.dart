@@ -20,6 +20,7 @@ import 'features/orders/repositories/orders_repository.dart';
 import 'features/prescriptions/providers/prescription_provider.dart';
 import 'features/prescriptions/repositories/prescription_repository.dart';
 import 'features/profile/repositories/profile_repository.dart';
+import 'core/services/api_service.dart';
 import 'app/app.dart';
 import 'features/onboarding/splash.dart';
 
@@ -56,16 +57,16 @@ class AppDependencies {
     final userDataRegistry = UserDataRegistry();
     final migrator = Migrator();
 
+    ApiService.logger = logger;
+
     final authRepo = AuthRepository(
       secureStore: secureStore,
       appSettingsStore: store,
-      remoteDataSource: FakeAuthRemoteDataSource(),
       logger: logger,
     );
 
     final cartRepo = CartRepository(
       store: store,
-      remoteDataSource: FakeCartRemoteDataSource(),
       migrator: migrator,
       userDataRegistry: userDataRegistry,
       logger: logger,

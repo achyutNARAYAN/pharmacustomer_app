@@ -1,3 +1,4 @@
+import '../../../core/services/api_service.dart';
 import '../models/patient_profile.dart';
 
 abstract interface class PatientRepository {
@@ -7,61 +8,91 @@ abstract interface class PatientRepository {
   Future<void> deleteProfile(String id);
 }
 
-/// In-memory demo data; replace this implementation with the patient API.
-class MockPatientRepository implements PatientRepository {
-  MockPatientRepository(String selfName) {
-    _profiles ??= [
+class ApiServicePatientRepository implements PatientRepository {
+  final String selfName;
+  final List<PatientProfile> _cachedProfiles = [];
+
+  ApiServicePatientRepository(this.selfName) {
+    _cachedProfiles.add(
       PatientProfile(
         id: 'self',
         name: selfName.isEmpty ? 'You' : selfName,
         relation: PatientRelation.self,
         isSelf: true,
         isDefault: true,
-        gender: 'Female',
-        dob: DateTime(1992, 4, 15),
-        chronicConditions: const ['Type 2 Diabetes'],
-        allergies: const ['Penicillin'],
-        prescriptionCount: 3,
-        lastUpdated: DateTime(2026, 10, 12),
+        gender: '',
+        lastUpdated: DateTime.now(),
       ),
-      PatientProfile(
-        id: 'father',
-        name: 'Rajesh Kumar',
-        relation: PatientRelation.father,
-        gender: 'Male',
-        dob: DateTime(1964, 3, 2),
-        chronicConditions: const ['Hypertension'],
-        allergies: const ['Sulfa drugs'],
-        prescriptionCount: 2,
-        lastUpdated: DateTime(2026, 10, 9),
-      ),
-      PatientProfile(
-        id: 'mother',
-        name: 'Meena Kumar',
-        relation: PatientRelation.mother,
-        gender: 'Female',
-        dob: DateTime(1968, 8, 21),
-        chronicConditions: const ['Thyroid'],
-        prescriptionCount: 1,
-        lastUpdated: DateTime(2026, 10, 6),
-      ),
-    ];
+    );
   }
 
-  static List<PatientProfile>? _profiles;
-  List<PatientProfile> get _items => _profiles!;
+  @override
+  Future<List<PatientProfile>> getProfiles() async {
+    try {
+      if (ApiService.token != null) {
+        final data = await ApiService.getCustomerProfile();
+        if (data != null) {
+          final members = (data['familyMembers'] as List<dynamic>? ?? []);
+          for (final m in members) {
+            final id = m['_id'] as String? ?? m['id'] as String? ?? '';
+            if (!_cachedProfiles.any((p) => p.id == id)) {
+              _cachedProfiles.add(
+                PatientProfile(
+                  id: id,
+                  name: m['fullName'] as String? ?? '',
+                  relation: _parseRelation(m['relationship'] as String?),
+                  gender: m['gender'] as String? ?? '',
+                  lastUpdated: DateTime.now(),
+                ),
+              );
+            }
+          }
+        }
+      }
+    } catch (_) {
+      // Offline fallback to cached profiles
+    }
+    return List.unmodifiable(_cachedProfiles);
+  }
+
+  PatientRelation _parseRelation(String? rel) {
+    if (rel == null) return PatientRelation.other;
+    return switch (rel.toLowerCase()) {
+      'father' => PatientRelation.father,
+      'mother' => PatientRelation.mother,
+      'son' => PatientRelation.son,
+      'daughter' => PatientRelation.daughter,
+      'self' => PatientRelation.self,
+      _ => PatientRelation.other,
+    };
+  }
 
   @override
-  Future<List<PatientProfile>> getProfiles() async => List.unmodifiable(_items);
-  @override
-  Future<void> addProfile(PatientProfile profile) async => _items.add(profile);
+  Future<void> addProfile(PatientProfile profile) async {
+    _cachedProfiles.add(profile);
+    try {
+      if (ApiService.token != null) {
+        await ApiService.addFamilyMember(
+          ApiService.currentCustomerId,
+          fullName: profile.name,
+          relationship: profile.relation.label,
+          age: profile.dob != null
+              ? (DateTime.now().year - profile.dob!.year)
+              : 30,
+          gender: profile.gender.isNotEmpty ? profile.gender : 'Other',
+        );
+      }
+    } catch (_) {}
+  }
+
   @override
   Future<void> updateProfile(PatientProfile profile) async {
-    final index = _items.indexWhere((p) => p.id == profile.id);
-    if (index >= 0) _items[index] = profile;
+    final index = _cachedProfiles.indexWhere((p) => p.id == profile.id);
+    if (index >= 0) _cachedProfiles[index] = profile;
   }
 
   @override
-  Future<void> deleteProfile(String id) async =>
-      _items.removeWhere((p) => p.id == id);
+  Future<void> deleteProfile(String id) async {
+    _cachedProfiles.removeWhere((p) => p.id == id);
+  }
 }

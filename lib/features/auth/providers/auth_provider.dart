@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../../../core/services/api_service.dart';
 import '../../../core/storage/user_data_registry.dart';
 import '../models/auth_session.dart';
 import '../repositories/auth_repository.dart';
@@ -68,25 +69,20 @@ class AuthProvider extends ChangeNotifier {
       // Different user logging in -> wipe previous user data
       await userDataRegistry.wipeUser(oldUserId);
     }
+    ApiService.setToken(newSession.accessToken);
+    if (newSession.userId.isNotEmpty && newSession.userId != 'u_customer') {
+      ApiService.setCustomerId(newSession.userId);
+    }
     await _repo.saveSession(newSession);
     _session = newSession;
     _status = AuthStatus.authenticated;
     _safeNotify();
   }
 
-  /// Explicit user-initiated logout
   Future<void> logout() async {
     final uid = _session?.userId;
-    try {
-      if (_session?.accessToken != null) {
-        await _repo.remoteDataSource
-            .logout(_session!.accessToken)
-            .timeout(const Duration(seconds: 3));
-      }
-    } catch (_) {
-      // Best-effort remote logout
-    }
-
+    ApiService.setToken(null);
+    ApiService.setCustomerId(null);
     if (uid != null) {
       await userDataRegistry.wipeUser(uid);
     }

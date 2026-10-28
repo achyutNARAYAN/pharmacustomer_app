@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/models/medicine_model.dart';
 import '../../core/theme.dart';
 import '../medicine/medicine_detail_extended.dart';
 import 'widgets/in_stock_section.dart';
@@ -35,7 +36,19 @@ class CgmSubCategory extends StatelessWidget {
   VoidCallback _navigateToDetail(BuildContext context) => () => Navigator.push(
         context,
         MaterialPageRoute(
-            builder: (_) => const MedicineDetailExtended()),
+          builder: (_) => const MedicineDetailExtended(
+            medicine: Medicine(
+              name: 'FreeStyle Libre CGM Sensor',
+              description: '14-day continuous glucose monitoring sensor',
+              price: '4999.00',
+              mrp: '5550.00',
+              discount: '10% OFF',
+              badge: 'OTC Device',
+              requiresPrescription: false,
+              tag: '1 Sensor Kit',
+            ),
+          ),
+        ),
       );
 
   // ── AppBar ────────────────────────────────────────────────────────────────

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/theme.dart';
 import '../../core/constants/app_strings.dart';
+import '../../core/services/api_service.dart';
 import 'otp.dart';
 
 class Login extends StatefulWidget {
@@ -14,6 +15,7 @@ class Login extends StatefulWidget {
 
 class _LoginState extends State<Login> {
   final TextEditingController _phoneController = TextEditingController();
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -21,13 +23,34 @@ class _LoginState extends State<Login> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     final phone = _phoneController.text.trim();
-    if (phone.length != 10) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => Otp(phoneNumber: phone)),
-    );
+    if (phone.length != 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a valid 10-digit mobile number')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      final res = await ApiService.sendOtp(phone);
+      final cooldown = (res['cooldownSeconds'] as num?)?.toInt() ?? 60;
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => Otp(phoneNumber: phone, initialCooldown: cooldown),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceAll('ValidationFailure: ', '').replaceAll('NetworkFailure: ', ''))),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -135,15 +158,34 @@ class _LoginState extends State<Login> {
                 ),
               ),
               const SizedBox(height: 48),
-              ElevatedButton(
-                onPressed: _submit,
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text('Get OTP'),
-                    SizedBox(width: 8),
-                    Icon(Icons.arrow_forward, size: 18),
-                  ],
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _submit,
+                  style: ElevatedButton.styleFrom(
+                    disabledBackgroundColor: AppTheme.primary,
+                    disabledForegroundColor: Colors.white,
+                  ),
+                  child: _isLoading
+                      ? const Center(
+                          child: SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          ),
+                        )
+                      : const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text('Get OTP'),
+                            SizedBox(width: 8),
+                            Icon(Icons.arrow_forward, size: 18),
+                          ],
+                        ),
                 ),
               ),
               const SizedBox(height: 16),

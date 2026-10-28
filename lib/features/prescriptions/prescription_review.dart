@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
@@ -64,26 +63,6 @@ class _PrescriptionReviewState extends State<PrescriptionReview> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             children: [
-              _patientCard(),
-              if (widget.allergies.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppTheme.warningBg,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    'Check for allergies: ${widget.allergies.join(', ')}',
-                    style: const TextStyle(
-                      color: AppTheme.warningText,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 16),
               _documentPreviewCard(),
               const SizedBox(height: 20),
               _pageStripSection(),
@@ -133,72 +112,6 @@ class _PrescriptionReviewState extends State<PrescriptionReview> {
     ],
   );
 
-  // ── Patient card ───────────────────────────────────────────────────────────
-
-  Widget _patientCard() => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-    decoration: BoxDecoration(
-      color: _kSurface,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: AppTheme.outlineBorder),
-    ),
-    child: Row(
-      children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: const BoxDecoration(
-            color: AppTheme.primaryContainer,
-            shape: BoxShape.circle,
-          ),
-          child: widget.profileImagePath == null
-              ? const Icon(
-                  Icons.person_rounded,
-                  color: AppTheme.primary,
-                  size: 20,
-                )
-              : CircleAvatar(
-                  backgroundImage: FileImage(File(widget.profileImagePath!)),
-                ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Prescription for',
-                style: TextStyle(fontSize: 11, color: AppTheme.mutedText),
-              ),
-              Text(
-                '${widget.patientName} (Self)',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.text,
-                ),
-              ),
-            ],
-          ),
-        ),
-        OutlinedButton.icon(
-          onPressed: () async {
-            final file = await showPrescriptionUploadSheet(context);
-            _replaceWith(file);
-          },
-          icon: const Icon(Icons.edit_rounded, size: 13),
-          label: const Text('Change', style: TextStyle(fontSize: 12)),
-          style: OutlinedButton.styleFrom(
-            minimumSize: Size.zero,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
 
   // ── Document preview ───────────────────────────────────────────────────────
 
@@ -458,21 +371,13 @@ class _PrescriptionReviewState extends State<PrescriptionReview> {
 
   // ── Submit bar ─────────────────────────────────────────────────────────────
 
-  Widget _submitBar() => Container(
-    decoration: BoxDecoration(
-      color: _kSurface,
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withValues(alpha: .06),
-          blurRadius: 16,
-          offset: const Offset(0, -4),
-        ),
-      ],
-    ),
-    child: SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+  Widget _submitBar() => SafeArea(
+    top: false,
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      child: SizedBox(
+        width: double.infinity,
+        height: 50,
         child: ElevatedButton.icon(
           onPressed: _submit,
           icon: const Icon(Icons.send_rounded, size: 18),
@@ -582,13 +487,6 @@ class _PrescriptionReviewState extends State<PrescriptionReview> {
     });
   }
 
-  void _replaceWith(PlatformFile? file) {
-    if (!mounted || file == null) return;
-    setState(() {
-      _files[_selectedPage] = file;
-      _pdfPreviews[_selectedPage] = _loadPdfPreview(file);
-    });
-  }
 
   Future<void> _submit() async {
     final submitted = await Navigator.push<bool>(
@@ -622,21 +520,23 @@ class PrescriptionSubmitted extends StatelessWidget {
                   child: Container(
                     width: 88,
                     height: 88,
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryContainer,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFE2F7F6),
                       shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.primary.withValues(alpha: .15),
-                          blurRadius: 24,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
                     ),
-                    child: const Icon(
-                      Icons.check_circle_rounded,
-                      size: 48,
-                      color: AppTheme.primary,
+                    alignment: Alignment.center,
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: const BoxDecoration(
+                        color: AppTheme.primary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.check_rounded,
+                        color: Colors.white,
+                        size: 28,
+                      ),
                     ),
                   ),
                 ),
@@ -751,24 +651,16 @@ class PrescriptionSubmitted extends StatelessWidget {
             ),
           ),
           // Bottom actions
-          Container(
-            decoration: BoxDecoration(
-              color: _kSurface,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: .06),
-                  blurRadius: 16,
-                  offset: const Offset(0, -4),
-                ),
-              ],
-            ),
-            child: SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                child: Column(
-                  children: [
-                    ElevatedButton.icon(
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              child: Column(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton.icon(
                       onPressed: () => Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -779,14 +671,18 @@ class PrescriptionSubmitted extends StatelessWidget {
                       icon: const Icon(Icons.assignment_outlined, size: 18),
                       label: const Text('Track Pharmacist Review'),
                     ),
-                    const SizedBox(height: 10),
-                    OutlinedButton.icon(
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: OutlinedButton.icon(
                       onPressed: () => Navigator.pop(context, true),
                       icon: const Icon(Icons.storefront_outlined, size: 18),
                       label: const Text('Browse Products While You Wait'),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),

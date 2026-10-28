@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme.dart';
 import 'live_tracking.dart';
+import 'tax_invoice.dart';
 import '../support/clinical_support.dart';
 
 class ClinicalDispensing extends StatelessWidget {
@@ -123,10 +124,26 @@ class ClinicalDispensing extends StatelessWidget {
                 label: const Text('View Live Fulfillment & Map'),
               ),
             ),
-            OutlinedButton.icon(
-              onPressed: () {},
-              icon: const Icon(Icons.download_outlined),
-              label: const Text('Download Invoice'),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  // Navigate to the tax invoice screen
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => const TaxInvoice(),
+                    ),
+                  );
+                  // Generate and save to device documents/downloads + share
+                  try {
+                    await generateAndSaveInvoicePdf();
+                  } catch (_) {}
+                },
+                icon: const Icon(Icons.download_outlined),
+                label: const Text('Download Invoice'),
+              ),
             ),
           ],
         ),

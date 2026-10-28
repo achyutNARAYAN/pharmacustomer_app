@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
-import '../cart/live_tracking.dart';
 
 class ClinicalSupport extends StatefulWidget {
   const ClinicalSupport({super.key});
@@ -14,20 +13,15 @@ class _ClinicalSupportState extends State<ClinicalSupport> {
   final _input = TextEditingController();
   final _messages = <_Message>[
     const _Message(
-      'Hello Marcus! I am your PharmaCustomer_app clinical liaison. Dr. Verma has pulled up your active medications and cold-chain parcel records.',
+      'Hello! I am your PharmaCustomer clinical liaison. A registered pharmacist is available to assist you with medication queries and dosage instructions.',
       false, 
     ),
     const _Message(
-      'Order #AC-884920 · Dapavel 10mg · Cold-chain status 4.2°C optimal · Out for rapid courier',
-      false,
-      orderCard: true,
-    ),
-    const _Message(
-      'Dr. Verma, should I take my medicine with breakfast?',
+      'Should I take my prescribed medicine with meals or on an empty stomach?',
       true,
     ),
     const _Message(
-      'Thanks for checking. Please follow the directions on your prescription label. I can connect you with the pharmacist for guidance specific to your prescription.',
+      'Thanks for checking. Please follow the directions on your prescription label. I can connect you directly with an on-duty pharmacist for personalized dosage guidance.',
       false,
       guidance: true,
     ),
@@ -151,11 +145,11 @@ class _ClinicalSupportState extends State<ClinicalSupport> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Dr. Arjun Verma, Pharm.D',
+                'Clinical Support Pharmacist',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               Text(
-                'Clinical Specialist · Lic #PHA-88392',
+                'Registered Pharmacy Consultant',
                 style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
               ),
             ],
@@ -213,27 +207,6 @@ class _ClinicalSupportState extends State<ClinicalSupport> {
               height: 1.4,
             ),
           ),
-          if (message.orderCard) ...[
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AppTheme.surfaceLow,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Dapavel 10mg\nCold-chain 4.2°C · Optimal',
-                      style: TextStyle(fontSize: 11),
-                    ),
-                  ),
-                  Icon(Icons.thermostat, color: AppTheme.primary),
-                ],
-              ),
-            ),
-          ],
           if (message.guidance) ...[
             const SizedBox(height: 10),
             Container(
@@ -266,38 +239,11 @@ class _ClinicalSupportState extends State<ClinicalSupport> {
               padding: const EdgeInsets.only(top: 6),
               child: Text(
                 message.guidance
-                    ? 'Dr. Arjun Verma · 10:45 AM'
-                    : 'AuraBot · 10:43 AM',
+                    ? 'Clinical Pharmacist'
+                    : 'PharmaCustomer Assistant',
                 style: const TextStyle(fontSize: 10, color: AppTheme.mutedText),
               ),
             ),
-          if (message.orderCard) ...[
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute<void>(
-                        builder: (_) => const LiveTracking(),
-                      ),
-                    ),
-                    icon: const Icon(Icons.navigation_outlined),
-                    label: const Text('Track Courier'),
-                  ),
-                ),
-                IconButton(
-                  onPressed: () =>
-                      _snack('Pharmacist seal verified for order #AC-884920'),
-                  icon: const Icon(
-                    Icons.verified_user_outlined,
-                    color: AppTheme.primary,
-                  ),
-                ),
-              ],
-            ),
-          ],
         ],
       ),
     ),
@@ -410,10 +356,8 @@ class _Message {
     this.text,
     this.fromPatient, {
     this.guidance = false,
-    this.orderCard = false,
   });
   final String text;
   final bool fromPatient;
   final bool guidance;
-  final bool orderCard;
 }

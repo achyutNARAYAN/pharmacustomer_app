@@ -8,30 +8,13 @@ import '../../../core/storage/write_coordinator.dart';
 import '../models/cart_merge_policy.dart';
 import '../models/cart_snapshot.dart';
 
-abstract interface class CartRemoteDataSource {
-  Future<CartSnapshot?> getCart(String userId);
-  Future<CartSnapshot> putCart(String userId, CartSnapshot snapshot);
-}
-
-class FakeCartRemoteDataSource implements CartRemoteDataSource {
-  CartSnapshot? _serverCart;
-
-  @override
-  Future<CartSnapshot?> getCart(String userId) async => _serverCart;
-
-  @override
-  Future<CartSnapshot> putCart(String userId, CartSnapshot snapshot) async {
-    _serverCart = snapshot;
-    return snapshot;
-  }
-}
+import '../../../core/services/api_service.dart';
 
 class CartRepository implements UserScopedStore {
   static const int currentVersion = 1;
   static const String guestKey = 'cart.guest';
 
   final KeyValueStore store;
-  final CartRemoteDataSource remoteDataSource;
   final Migrator migrator;
   final UserDataRegistry userDataRegistry;
   final AppLogger? logger;
@@ -40,12 +23,31 @@ class CartRepository implements UserScopedStore {
 
   CartRepository({
     required this.store,
-    required this.remoteDataSource,
     required this.migrator,
     required this.userDataRegistry,
     this.logger,
   }) {
     userDataRegistry.registerStore(this);
+  }
+
+  /// Syncs remote cart from ApiService if online
+  Future<CartSnapshot?> fetchRemoteCart() async {
+    try {
+      final res = await ApiService.getCart();
+      if (res != null) return CartSnapshot.fromJson(res);
+    } catch (e) {
+      logger?.warning('Failed to fetch remote cart: $e');
+    }
+    return null;
+  }
+
+  /// Syncs an item quantity change to ApiService if online
+  Future<void> syncItemToRemote(String medicineId, int quantity) async {
+    try {
+      await ApiService.addCartItem(medicineId, quantity);
+    } catch (e) {
+      logger?.warning('Failed to sync item to remote cart: $e');
+    }
   }
 
   String keyFor(String? userId) {

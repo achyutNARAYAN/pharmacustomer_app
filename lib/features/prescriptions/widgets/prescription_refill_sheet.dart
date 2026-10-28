@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme.dart';
 
-Future<void> showPrescriptionRefillSheet(BuildContext context) =>
+Future<void> showPrescriptionRefillSheet(
+  BuildContext context, {
+  String doctorName = 'Prescribing Physician',
+  String medicineInfo = 'Authorized refill active',
+}) =>
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -14,12 +18,12 @@ Future<void> showPrescriptionRefillSheet(BuildContext context) =>
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Dr. Rajiv Mehta, MD',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+              Text(
+                doctorName,
+                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
-              const Text('Metformin 500mg • 3 refills remaining'),
+              Text(medicineInfo),
               const SizedBox(height: 16),
               Material(
                 color: Colors.transparent,

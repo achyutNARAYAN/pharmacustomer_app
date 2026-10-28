@@ -1,23 +1,154 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/providers/profile_notifier.dart';
 import '../../core/theme.dart';
+
+Future<File> generateAndSaveInvoicePdf([String customerName = 'Verified Customer']) async {
+  final pdf = pw.Document();
+
+  pdf.addPage(
+    pw.Page(
+      pageFormat: PdfPageFormat.a4,
+      build: (pw.Context ctx) {
+        return pw.Padding(
+          padding: const pw.EdgeInsets.all(32),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Center(
+                child: pw.Text(
+                  'pharmaCustomer',
+                  style: pw.TextStyle(
+                    fontSize: 24,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColor.fromInt(0xFF087F8C),
+                  ),
+                ),
+              ),
+              pw.SizedBox(height: 8),
+              pw.Text(
+                'pharmaCustomer Retail & Specialty Pharmacy Pvt Ltd',
+                style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+              ),
+              pw.Text(
+                'Building 4B, Bio-Tech District, MIDC Phase II, Mumbai, MH - 400070',
+                style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+              ),
+              pw.Divider(height: 20),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text('Invoice No: AC-INV-2024-88402', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                      pw.Text('GSTIN: 27AABCA9182L1Z9', style: const pw.TextStyle(fontSize: 10)),
+                      pw.Text('Date: ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}', style: const pw.TextStyle(fontSize: 10)),
+                    ],
+                  ),
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                    children: [
+                      pw.Text('Billed To:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                      pw.Text(customerName, style: const pw.TextStyle(fontSize: 11)),
+                      pw.Text('Verified Delivery Location', style: const pw.TextStyle(fontSize: 10)),
+                    ],
+                  ),
+                ],
+              ),
+              pw.Divider(height: 20),
+              pw.Text('Prescription Items', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 8),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Janumet 50mg/500mg (JN8103F)'),
+                  pw.Text('INR 485.00'),
+                ],
+              ),
+              pw.SizedBox(height: 4),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Rosuvas 10mg (RV1008)'),
+                  pw.Text('INR 1,022.00'),
+                ],
+              ),
+              pw.SizedBox(height: 4),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Clinical dispatch & GST'),
+                  pw.Text('INR 161.46'),
+                ],
+              ),
+              pw.Divider(height: 20),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Taxable Subtotal'),
+                  pw.Text('INR 1,345.54'),
+                ],
+              ),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('CGST (6%) + SGST (6%)'),
+                  pw.Text('INR 161.46'),
+                ],
+              ),
+              pw.Divider(height: 16),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Total Amount', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+                  pw.Text('INR 1,507.00', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColor.fromInt(0xFF087F8C))),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    ),
+  );
+
+  final bytes = await pdf.save();
+  final dir = await getApplicationDocumentsDirectory();
+  final file = File('${dir.path}/Invoice_AC-INV-2024-88402.pdf');
+  await file.writeAsBytes(bytes);
+
+  // Share / save to device downloads or print
+  await Printing.sharePdf(bytes: bytes, filename: 'Invoice_AC-INV-2024-88402.pdf');
+
+  return file;
+}
 
 class TaxInvoice extends StatelessWidget {
   const TaxInvoice({super.key});
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Tax Invoice'),
-          Text(
-            'Order #AC-INV-2024-88402',
-            style: TextStyle(fontSize: 11, color: AppTheme.mutedText),
-          ),
-        ],
-      ),
+  Widget build(BuildContext context) {
+    final profile = context.watch<ProfileNotifier>();
+    final customerName = profile.name.isNotEmpty ? profile.name : 'Customer';
+    final customerLocation = profile.address.isNotEmpty ? profile.address : 'Verified Account';
+    return Scaffold(
+      appBar: AppBar(
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Tax Invoice'),
+            Text(
+              'Order Tax Receipt',
+              style: TextStyle(fontSize: 11, color: AppTheme.mutedText),
+            ),
+          ],
+        ),
       actions: [
         IconButton(onPressed: () {}, icon: const Icon(Icons.share_outlined)),
         IconButton(
@@ -67,7 +198,7 @@ class TaxInvoice extends StatelessWidget {
                 ],
               ),
               const Divider(height: 26),
-              const Row(
+              Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Expanded(
@@ -90,9 +221,9 @@ class TaxInvoice extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    'Billed To\nAditi Rao\nBengaluru, India',
+                    'Billed To\n$customerName\n$customerLocation',
                     textAlign: TextAlign.right,
-                    style: TextStyle(height: 1.4),
+                    style: const TextStyle(height: 1.4),
                   ),
                 ],
               ),
@@ -131,16 +262,33 @@ class TaxInvoice extends StatelessWidget {
     bottomNavigationBar: SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: ElevatedButton.icon(
-          onPressed: () => ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Invoice saved'))),
-          icon: const Icon(Icons.download_outlined),
-          label: const Text('Download Invoice'),
+        child: SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () async {
+              try {
+                final file = await generateAndSaveInvoicePdf(customerName);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Invoice saved to ${file.path}')),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to save invoice: $e')),
+                  );
+                }
+              }
+            },
+            icon: const Icon(Icons.download_outlined),
+            label: const Text('Download Invoice'),
+          ),
         ),
       ),
     ),
   );
+}
 }
 
 class _Detail extends StatelessWidget {

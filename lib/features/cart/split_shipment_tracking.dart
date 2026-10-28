@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/providers/cart_notifier.dart';
+import '../../core/providers/profile_notifier.dart';
 import '../../core/theme.dart';
 
 class SplitShipmentTracking extends StatelessWidget {
@@ -10,9 +11,11 @@ class SplitShipmentTracking extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartNotifier>();
+    final profile = context.watch<ProfileNotifier>();
     final items = cart.items;
     final first = items.isNotEmpty ? items.first : null;
     final second = items.length > 1 ? items.skip(1).toList() : <dynamic>[];
+    final addressDisplay = profile.address.isNotEmpty ? profile.address : 'Saved Delivery Address';
     return Scaffold(
       appBar: AppBar(
         leading: const BackButton(),
@@ -64,20 +67,20 @@ class SplitShipmentTracking extends StatelessWidget {
           const SizedBox(height: 16),
           _shipment(
             'Shipment 1 of 2',
-            'MedPlus Pharmacy #04',
-            'Sector 14 · Dispatch verified',
-            'Out for delivery · 8 mins',
+            'Fulfillment Hub 01',
+            'Licensed Pharmacy · Dispatch verified',
+            'Out for delivery · ~10 mins',
             first?.name ?? 'Medicine order',
             first == null ? 0 : first.total,
-            'Ramesh Kumar · Bike DL 04 AB 1234',
+            'Assigned Courier Partner · Delivery underway',
             true,
           ),
           const SizedBox(height: 16),
           _shipment(
             'Shipment 2 of 2',
-            'Apollo Pharmacy #12',
-            'Galleria Market · Pharmacist sorting',
-            'Packing at pharmacy · ~35 mins',
+            'Regional Dispensing Center',
+            'Clinical sorting & quality verified',
+            'Packing at pharmacy · ~30 mins',
             second.isEmpty
                 ? 'Remaining medicines'
                 : second.map((item) => item.name).join(', '),
@@ -87,14 +90,14 @@ class SplitShipmentTracking extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           _card(
-            const ListTile(
-              leading: Icon(
+            ListTile(
+              leading: const Icon(
                 Icons.location_on_outlined,
                 color: AppTheme.primary,
               ),
-              title: Text('Delivery Address & Payment'),
+              title: const Text('Delivery Address & Payment'),
               subtitle: Text(
-                'Home · Flat 402, Green Glen Layout\nPrepaid via UPI · Invoice available',
+                '$addressDisplay\nPrepaid Order · Digital invoice available',
               ),
             ),
           ),

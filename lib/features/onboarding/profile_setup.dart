@@ -2,9 +2,14 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/theme.dart';
-import 'location.dart';
+import '../../core/services/api_service.dart';
+import '../../core/providers/profile_notifier.dart';
+import '../auth/models/auth_session.dart';
+import '../auth/providers/auth_provider.dart';
+import '../home/main_nav_wrapper.dart';
 
 class ProfileSetup extends StatefulWidget {
   const ProfileSetup({super.key, this.phoneNumber = ''});
@@ -18,9 +23,11 @@ class _ProfileSetupState extends State<ProfileSetup> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _dobController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
+  DateTime? _selectedDobDate;
   XFile? _profileImage;
   String? _selectedGender;
   late String _phoneNumber;
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -47,6 +54,7 @@ class _ProfileSetupState extends State<ProfileSetup> {
     );
     if (picked != null) {
       setState(() {
+        _selectedDobDate = picked;
         _dobController.text =
             '${picked.day.toString().padLeft(2, '0')} / ${picked.month.toString().padLeft(2, '0')} / ${picked.year}';
       });
@@ -56,6 +64,92 @@ class _ProfileSetupState extends State<ProfileSetup> {
   Future<void> _selectProfileImage() async {
     final image = await ImagePicker().pickImage(source: ImageSource.gallery);
     if (image != null && mounted) setState(() => _profileImage = image);
+  }
+
+  Future<void> _completeProfile() async {
+    final name = _nameController.text.trim();
+    if (name.isEmpty || _dobController.text.isEmpty || _selectedGender == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Please enter your name, date of birth, and gender'),
+          backgroundColor: AppTheme.error,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+      return;
+    }
+    final dobIso = _selectedDobDate != null
+        ? '${_selectedDobDate!.year}-${_selectedDobDate!.month.toString().padLeft(2, '0')}-${_selectedDobDate!.day.toString().padLeft(2, '0')}'
+        : '';
+    final gender = _selectedGender == 'Female'
+        ? 'FEMALE'
+        : _selectedGender == 'Male'
+            ? 'MALE'
+            : 'OTHER';
+
+    setState(() => _isSaving = true);
+
+    try {
+      final res = await ApiService.registerCustomer(
+        mobileNumber: _phoneNumber.isNotEmpty ? _phoneNumber : '9876543210',
+        fullName: name,
+        email: _emailController.text.trim().isNotEmpty ? _emailController.text.trim() : null,
+        dob: dobIso.isNotEmpty ? dobIso : null,
+        gender: gender.isNotEmpty ? gender : null,
+      );
+
+      final token = (res['token'] as String?) ?? ApiService.token;
+      final custMap = (res['customer'] is Map ? res['customer'] : res) as Map<String, dynamic>?;
+      final rawMongoId = custMap?['_id'] as String? ?? custMap?['id'] as String? ?? custMap?['customerId'] as String? ?? '';
+      final customerId = rawMongoId;
+      if (customerId.isNotEmpty && customerId != 'u_customer') {
+        ApiService.setCustomerId(customerId);
+      }
+
+      if (token != null && token.isNotEmpty && mounted) {
+        final session = AuthSession(
+          accessToken: token,
+          refreshToken: token,
+          accessExpiresAt: DateTime.now().toUtc().add(const Duration(days: 30)),
+          userId: customerId.isNotEmpty ? customerId : 'u_customer',
+        );
+        await context.read<AuthProvider>().onOtpSuccess(session);
+      }
+
+      if (mounted) {
+        final profile = context.read<ProfileNotifier>();
+        profile.setName(name);
+        if (_phoneNumber.isNotEmpty) profile.setPhone(_phoneNumber);
+        if (_emailController.text.trim().isNotEmpty) profile.setEmail(_emailController.text.trim());
+      }
+
+      if (!mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MainNavWrapper(
+            name: name,
+            phoneNumber: _phoneNumber,
+            email: _emailController.text.trim(),
+            profileImagePath: _profileImage?.path,
+          ),
+        ),
+        (route) => false,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceAll('ValidationFailure: ', '').replaceAll('NetworkFailure: ', '')),
+          backgroundColor: AppTheme.error,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   @override
@@ -178,37 +272,21 @@ class _ProfileSetupState extends State<ProfileSetup> {
               ),
               const SizedBox(height: 48),
               ElevatedButton(
-                onPressed: () {
-                  final name = _nameController.text.trim();
-                  if (name.isEmpty || _dobController.text.isEmpty || _selectedGender == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: const Text('Please enter your name, date of birth, and gender'),
-                        backgroundColor: AppTheme.error,
-                        behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                onPressed: _isSaving ? null : _completeProfile,
+                child: _isSaving
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text('Complete Profile'),
+                          SizedBox(width: 8),
+                          Icon(Icons.arrow_forward, size: 18),
+                        ],
                       ),
-                    );
-                    return;
-                  }
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => Location(
-                      name: name,
-                      phoneNumber: _phoneNumber,
-                      email: _emailController.text.trim(),
-                      profileImagePath: _profileImage?.path,
-                    )),
-                  );
-                },
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text('Continue to Location'),
-                    SizedBox(width: 8),
-                    Icon(Icons.arrow_forward, size: 18),
-                  ],
-                ),
               ),
             ],
           ),

@@ -3,24 +3,45 @@ import 'package:provider/provider.dart';
 
 import '../../core/models/cart_item.dart';
 import '../../core/providers/cart_notifier.dart';
+import '../../core/services/api_service.dart';
 import '../../core/theme.dart';
 import '../../core/models/medicine_model.dart';
-import '../../core/models/mock_medicines.dart';
 import 'widgets/clinical_instructions_card.dart';
 import 'widgets/delivery_banner.dart';
 import 'widgets/medicine_hero_card_extended.dart';
 
 class MedicineDetailExtended extends StatefulWidget {
   final Medicine medicine;
-  const MedicineDetailExtended({super.key, this.medicine = janumet});
+  const MedicineDetailExtended({super.key, required this.medicine});
 
   @override
   State<MedicineDetailExtended> createState() => _MedicineDetailExtendedState();
 }
 
 class _MedicineDetailExtendedState extends State<MedicineDetailExtended> {
-  // ponytail: price will come from Medicine model once API is integrated
   int _quantity = 1;
+  late Medicine _medicine;
+
+  @override
+  void initState() {
+    super.initState();
+    _medicine = widget.medicine;
+    _fetchLiveDetails();
+  }
+
+  Future<void> _fetchLiveDetails() async {
+    final medId = widget.medicine.id;
+    if (medId != null && medId.isNotEmpty) {
+      try {
+        final data = await ApiService.getMedicineById(medId);
+        if (data != null && mounted) {
+          setState(() {
+            _medicine = Medicine.fromJson(data);
+          });
+        }
+      } catch (_) {}
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,16 +56,16 @@ class _MedicineDetailExtendedState extends State<MedicineDetailExtended> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            DeliveryBanner(),
-            SizedBox(height: 16),
-            MedicineHeroCardExtended(medicine: widget.medicine),
-            SizedBox(height: 16),
-            ClinicalInstructionsCard(),
-            SizedBox(height: 80),
+            const DeliveryBanner(),
+            const SizedBox(height: 16),
+            MedicineHeroCardExtended(medicine: _medicine),
+            const SizedBox(height: 16),
+            const ClinicalInstructionsCard(),
+            const SizedBox(height: 80),
           ],
         ),
       ),
@@ -53,8 +74,8 @@ class _MedicineDetailExtendedState extends State<MedicineDetailExtended> {
   }
 
   Widget _buildBottomBar() {
-    final price = double.parse(widget.medicine.price);
-    final cartId = widget.medicine.name;
+    final price = double.tryParse(_medicine.price.replaceAll('₹', '').trim()) ?? 0.0;
+    final cartId = _medicine.id ?? _medicine.name;
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
       decoration: const BoxDecoration(
@@ -100,11 +121,11 @@ class _MedicineDetailExtendedState extends State<MedicineDetailExtended> {
               onPressed: () {
                 final cart = context.read<CartNotifier>();
                 for (var i = 0; i < _quantity; i++) {
-                  cart.add(CartItem(id: cartId, name: widget.medicine.name, pack: widget.medicine.tag ?? '', price: price));
+                  cart.add(CartItem(id: cartId, name: _medicine.name, pack: _medicine.tag ?? '', price: price));
                 }
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('$_quantity × ${widget.medicine.name} added to cart'),
+                    content: Text('$_quantity × ${_medicine.name} added to cart'),
                     backgroundColor: AppTheme.primary,
                     behavior: SnackBarBehavior.floating,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),

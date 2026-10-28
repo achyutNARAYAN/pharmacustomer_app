@@ -2,13 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme.dart';
 import '../../../core/models/medicine_model.dart';
-import '../../../core/models/mock_medicines.dart';
 
 /// Extended hero card for MedicineDetailExtended.
 /// Shows temperature badges, pre-approved badge, manufacturer info, and price.
 class MedicineHeroCardExtended extends StatelessWidget {
   final Medicine medicine;
-  const MedicineHeroCardExtended({super.key, this.medicine = janumet});
+  const MedicineHeroCardExtended({super.key, required this.medicine});
 
   @override
   Widget build(BuildContext context) {

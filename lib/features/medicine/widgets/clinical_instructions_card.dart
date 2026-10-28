@@ -81,7 +81,7 @@ class ClinicalInstructionsCard extends StatelessWidget {
                   fontWeight: FontWeight.w500),
             ),
             SizedBox(height: 4),
-            Text('Authorized by Dr. Sharma  •  Follow meal schedule strictly',
+            Text('Authorized by Registered Pharmacist  •  Follow meal schedule strictly',
                 style: TextStyle(fontSize: 10, color: AppTheme.mutedText)),
           ],
         ),

@@ -20,7 +20,7 @@ class SavedPatientProfilesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ChangeNotifierProvider(
     create: (_) =>
-        PatientProfilesProvider(MockPatientRepository(userName))..refresh(),
+        PatientProfilesProvider(ApiServicePatientRepository(userName))..refresh(),
     child: _ProfilesView(
       userName: userName,
       profileImagePath: profileImagePath,

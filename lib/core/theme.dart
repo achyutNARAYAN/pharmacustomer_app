@@ -124,9 +124,9 @@ class AppTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: primary,
           side: const BorderSide(color: primary),
-          minimumSize: const Size(0, 48),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          textStyle: GoogleFonts.dmSans(fontSize: 14, fontWeight: FontWeight.w600),
+          minimumSize: const Size(double.infinity, 50),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          textStyle: GoogleFonts.dmSans(fontSize: 15, fontWeight: FontWeight.w700),
         ),
       ),
       // ── Input ───────────────────────────────────────────────────────────────

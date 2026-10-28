@@ -9,7 +9,7 @@ class DeliveryConfirmation extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('HealthRx'),
+      title: const Text('PharmaCustomer'),
       actions: [
         IconButton(
           onPressed: () {},
@@ -47,11 +47,11 @@ class DeliveryConfirmation extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               const Text(
-                'Ramesh Kumar  ★ 4.9',
+                'Verified Delivery Partner  ★ 4.9',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const Text(
-                'Bellandur Hub · Arrived at Door',
+                'Assigned Fulfillment Hub · Arrived at Door',
                 style: TextStyle(color: AppTheme.textSecondary),
               ),
               const Divider(height: 26),

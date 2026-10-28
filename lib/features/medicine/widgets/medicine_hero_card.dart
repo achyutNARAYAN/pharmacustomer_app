@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../../core/models/medicine_model.dart';
-import '../../../core/models/mock_medicines.dart';
-
 import '../../../core/theme.dart';
 
 /// Hero card shown on MedicineDetail (prescription-upload variant).
 /// Displays image placeholder, pack tag, name, composition, and price.
 class MedicineHeroCard extends StatelessWidget {
   final Medicine medicine;
-  const MedicineHeroCard({super.key, this.medicine = janumet});
+  const MedicineHeroCard({super.key, required this.medicine});
 
   @override
   Widget build(BuildContext context) {

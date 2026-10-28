@@ -120,7 +120,6 @@ void main() {
       migrator = Migrator();
       repository = CartRepository(
         store: store,
-        remoteDataSource: FakeCartRemoteDataSource(),
         migrator: migrator,
         userDataRegistry: registry,
       );

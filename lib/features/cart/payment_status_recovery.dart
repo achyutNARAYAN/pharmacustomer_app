@@ -10,32 +10,38 @@ class PaymentStatusRecovery extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('HealthRx · pharmaCustomer'),
-      actions: const [
-        Padding(padding: EdgeInsets.all(16), child: Text('🔒 256-BIT SYNC')),
-      ],
+      leading: IconButton(
+        tooltip: 'Back',
+        onPressed: () => Navigator.maybePop(context),
+        icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+      ),
+      title: const Text('PharmaCustomer'),
     ),
     body: ListView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
       children: [
         const Text(
-          '● TRANSACTION RECONCILIATION',
+          'TRANSACTION RECONCILIATION',
           style: TextStyle(
-            fontSize: 11,
+            fontSize: 12,
             color: AppTheme.primary,
             fontWeight: FontWeight.bold,
           ),
         ),
-        const Text(
+        Text(
           'Verifying Payment & Syncing Order',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+            fontSize: 18,
+            height: 1.2,
+            letterSpacing: -0.4,
+          ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
         Container(
-          padding: const EdgeInsets.all(22),
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(24),
             border: Border.all(color: AppTheme.outlineBorder),
           ),
           child: Column(
@@ -48,32 +54,39 @@ class PaymentStatusRecovery extends StatelessWidget {
               const SizedBox(height: 18),
               const Text(
                 'Restoring Order Status…',
-                style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               const Text(
                 'We are verifying your transaction with your bank. If money was debited, your order will confirm automatically without double charge.',
                 textAlign: TextAlign.center,
-                style: TextStyle(height: 1.45, color: AppTheme.textSecondary),
+                style: TextStyle(
+                  fontSize: 15,
+                  height: 1.5,
+                  color: AppTheme.textSecondary,
+                ),
               ),
               const Divider(height: 28),
               const Row(
                 children: [
                   Expanded(
-                    child: _Info('Order Reference', '#AC-9941 · ₹1,507.00'),
+                    child: _Info(
+                      'Order reference',
+                      '#AC-9941 · ₹1,507.00',
+                    ),
                   ),
                   SizedBox(width: 8),
                   Expanded(
-                    child: _Info('Gateway Tracking', 'RZP_ORDER_98192746'),
+                    child: _Info('Gateway tracking', 'RZP_ORDER_98192746'),
                   ),
                 ],
               ),
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(18),
@@ -82,10 +95,10 @@ class PaymentStatusRecovery extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '▤ Medication Manifest',
+                'Medication summary',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
-              SizedBox(height: 16),
+              SizedBox(height: 14),
               _Line('Janumet 50mg/500mg', '₹485.00'),
               Divider(),
               _Line('Rosuvas 10mg', '₹1,022.00'),
@@ -94,11 +107,14 @@ class PaymentStatusRecovery extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 16),
-        const LinearProgressIndicator(value: .4, minHeight: 8),
+        const SizedBox(height: 18),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: const LinearProgressIndicator(value: .4, minHeight: 6),
+        ),
         const SizedBox(height: 8),
         const Text(
-          'Polling banking node · Auto refresh in 10s',
+          'Checking with your bank · Next update in 10s',
           textAlign: TextAlign.center,
           style: TextStyle(color: AppTheme.mutedText),
         ),
@@ -106,7 +122,7 @@ class PaymentStatusRecovery extends StatelessWidget {
     ),
     bottomNavigationBar: SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -120,18 +136,22 @@ class PaymentStatusRecovery extends StatelessWidget {
                   ),
                 ),
                 icon: const Icon(Icons.refresh),
-                label: const Text('I have been debited · Check status now'),
+                label: const Text('I was charged · Check status'),
               ),
             ),
-            OutlinedButton.icon(
-              onPressed: () => Navigator.pushReplacement(
-                context,
-                MaterialPageRoute<void>(
-                  builder: (_) => const PaymentDeclined(),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => const PaymentDeclined(),
+                  ),
                 ),
+                icon: const Icon(Icons.hourglass_bottom),
+                label: const Text('Still pending · See retry options'),
               ),
-              icon: const Icon(Icons.hourglass_bottom),
-              label: const Text('Still pending · Retry options'),
             ),
           ],
         ),
@@ -147,7 +167,7 @@ class _Info extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(10),
+    padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(
       color: AppTheme.background,
       borderRadius: BorderRadius.circular(12),
@@ -157,11 +177,12 @@ class _Info extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 10, color: AppTheme.mutedText),
+          style: const TextStyle(fontSize: 11, color: AppTheme.mutedText),
         ),
-        Text(
+        const SizedBox(height: 4),
+        SelectableText(
           value,
-          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
         ),
       ],
     ),

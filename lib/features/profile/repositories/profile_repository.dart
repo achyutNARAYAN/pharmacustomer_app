@@ -21,8 +21,8 @@ class UserProfile {
     required this.phoneNumber,
     this.email = '',
     this.address = '',
-    this.workAddress = 'Tower 4, Ecospace Business Park, Outer Ring Rd, Bellandur, Bengaluru 560103',
-    this.parentsAddress = '12th Main, Indiranagar, Bengaluru 560038',
+    this.workAddress = '',
+    this.parentsAddress = '',
     this.profileImagePath,
     required this.updatedAt,
   });
@@ -58,8 +58,8 @@ class UserProfile {
       phoneNumber: phoneNumber,
       email: (json['email'] as String?) ?? '',
       address: (json['address'] as String?) ?? '',
-      workAddress: (json['workAddress'] as String?) ?? 'Tower 4, Ecospace Business Park, Outer Ring Rd, Bellandur, Bengaluru 560103',
-      parentsAddress: (json['parentsAddress'] as String?) ?? '12th Main, Indiranagar, Bengaluru 560038',
+      workAddress: (json['workAddress'] as String?) ?? '',
+      parentsAddress: (json['parentsAddress'] as String?) ?? '',
       profileImagePath: json['profileImagePath'] as String?,
       updatedAt: updatedAt,
     );

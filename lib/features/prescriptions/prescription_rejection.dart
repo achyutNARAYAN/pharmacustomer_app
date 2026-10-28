@@ -42,7 +42,7 @@ class PrescriptionRejection extends StatelessWidget {
               ),
               SizedBox(height: 6),
               Text(
-                'Dr. Arjun Verma (Lead Pharmacist Reg #PH-44910) declined fulfillment under statutory Schedule H / H1 compliance rules of the Indian Drugs and Cosmetics Act.',
+                'The reviewing pharmacist declined fulfillment under statutory Schedule H / H1 compliance rules of the Indian Drugs and Cosmetics Act.',
                 style: TextStyle(color: Color(0xFF9B2929), height: 1.45),
               ),
             ],

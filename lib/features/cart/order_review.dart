@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/providers/cart_notifier.dart';
+import '../../core/providers/profile_notifier.dart';
+import '../../core/services/api_service.dart';
 import '../../core/theme.dart';
 import 'payment_processing.dart';
 
@@ -13,25 +15,30 @@ class OrderReview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartNotifier>();
+    final profile = context.watch<ProfileNotifier>();
+    final customerName = profile.name.isNotEmpty ? profile.name : 'Customer';
+    final deliveryAddress = profile.address.isNotEmpty
+        ? profile.address
+        : 'Primary Delivery Location';
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
         leading: const BackButton(),
         title: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('Review & Confirm Order'),
-          Text('Draft  #ORD-9841', style: TextStyle(fontSize: 12, color: AppTheme.mutedText)),
+          Text('Express Checkout', style: TextStyle(fontSize: 12, color: AppTheme.mutedText)),
         ]),
       ),
       body: ListView(padding: const EdgeInsets.fromLTRB(18, 12, 18, 24), children: [
         _card(Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           _iconBox(Icons.local_shipping_outlined),
           const SizedBox(width: 14),
-          const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Express Delivery Slot', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-            SizedBox(height: 5),
-            Text('Home · Aditi Rao', style: TextStyle(color: AppTheme.mutedText)),
-            SizedBox(height: 3),
-            Text('Flat 402, Green Glen Layout, Bellandur, Bengaluru', style: TextStyle(color: AppTheme.mutedText, height: 1.35)),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Express Delivery Slot', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 5),
+            Text('Home · $customerName', style: const TextStyle(color: AppTheme.mutedText)),
+            const SizedBox(height: 3),
+            Text(deliveryAddress, style: const TextStyle(color: AppTheme.mutedText, height: 1.35)),
           ])),
           const SizedBox(width: 8),
           const Text('22 min', style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold)),
@@ -79,7 +86,32 @@ class OrderReview extends StatelessWidget {
           Expanded(child: Text('By authorizing, you confirm this order and agree to the pharmacy dispensing terms.', style: TextStyle(color: AppTheme.mutedText, height: 1.4))),
         ]),
       ]),
-      bottomNavigationBar: SafeArea(child: Padding(padding: const EdgeInsets.fromLTRB(18, 8, 18, 18), child: ElevatedButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => PaymentProcessing(amount: amount))), icon: const Icon(Icons.verified_user_outlined), label: Text('Authorize & Pay  ·  ₹${amount.toStringAsFixed(0)}')))),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
+          child: ElevatedButton.icon(
+            onPressed: () async {
+              try {
+                if (ApiService.token != null) {
+                  await ApiService.checkout(
+                    addressId: 'addr_default',
+                    prescriptionId: cart.hasPrescriptionAttached ? 'RX-CURRENT' : null,
+                  );
+                }
+              } catch (_) {}
+              if (!context.mounted) return;
+              Navigator.push(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (_) => PaymentProcessing(amount: amount),
+                ),
+              );
+            },
+            icon: const Icon(Icons.verified_user_outlined),
+            label: Text('Authorize & Pay  ·  ₹${amount.toStringAsFixed(0)}'),
+          ),
+        ),
+      ),
     );
   }
 }

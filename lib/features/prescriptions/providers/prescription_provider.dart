@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../../../core/providers/load_status.dart';
+import '../../../core/services/api_service.dart';
 import '../repositories/prescription_repository.dart';
 
 class PrescriptionProvider extends ChangeNotifier implements PersistedProvider {
@@ -54,6 +55,42 @@ class PrescriptionProvider extends ChangeNotifier implements PersistedProvider {
     final loaded = await _repository.hydrate(_userId!);
     _prescriptions.clear();
     _prescriptions.addAll(loaded);
+
+    try {
+      if (ApiService.token != null) {
+        final remoteItems = await ApiService.listPrescriptions(customerId: _userId);
+        if (remoteItems.isNotEmpty) {
+          for (final item in remoteItems) {
+            final rxId = item['prescriptionId'] as String? ?? item['_id'] as String? ?? '';
+            final statusStr = (item['status'] as String? ?? '').toUpperCase();
+            final status = switch (statusStr) {
+              'APPROVED' => PrescriptionStatus.approved,
+              'REJECTED' => PrescriptionStatus.rejected,
+              'EXPIRED' => PrescriptionStatus.expired,
+              'PENDING_REVIEW' => PrescriptionStatus.underReview,
+              _ => PrescriptionStatus.uploaded,
+            };
+            if (!_prescriptions.any((p) => p.id == rxId)) {
+              _prescriptions.add(
+                Prescription(
+                  id: rxId,
+                  source: 'upload',
+                  status: status,
+                  fileName: item['fileName'] as String? ?? 'Prescription.pdf',
+                  mime: item['mimeType'] as String? ?? 'application/pdf',
+                  sizeBytes: (item['fileSize'] as num?)?.toInt() ?? 1024,
+                  remoteUrl: item['documentUrl'] as String?,
+                  doctorName: item['doctorName'] as String?,
+                  createdAt: DateTime.tryParse(item['prescriptionDate'] as String? ?? '') ?? DateTime.now(),
+                  updatedAt: DateTime.now(),
+                ),
+              );
+            }
+          }
+          _repository.schedulePersist(_userId!, _prescriptions);
+        }
+      }
+    } catch (_) {}
 
     _status = LoadStatus.ready;
     _safeNotify();

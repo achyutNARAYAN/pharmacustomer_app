@@ -7,6 +7,7 @@ import '../../core/models/cart_item.dart';
 import '../../core/theme.dart';
 import '../prescriptions/providers/prescription_provider.dart';
 import '../prescriptions/repositories/prescription_repository.dart';
+import '../../core/providers/profile_notifier.dart';
 import 'address.dart';
 
 class Cart extends StatelessWidget {
@@ -18,6 +19,10 @@ class Cart extends StatelessWidget {
     final rxProvider = context.watch<PrescriptionProvider?>();
     final rxStatus = rxProvider?.latestStatus ?? PrescriptionStatus.noneAttached;
     final isHydrating = cart.status == LoadStatus.hydrating;
+    final profile = context.watch<ProfileNotifier?>();
+    final addressText = (profile?.address.isNotEmpty ?? false)
+        ? 'Deliver to ${profile!.address.split(',').first.trim()}…'
+        : 'Deliver to primary address…';
 
     return Scaffold(
       appBar: AppBar(
@@ -54,7 +59,7 @@ class Cart extends StatelessWidget {
                         color: AppTheme.primary,
                       ),
                     ),
-                    subtitle: const Text('Deliver to Bellandur, Bengaluru…'),
+                    subtitle: Text(addressText),
                     trailing: TextButton(
                       onPressed: () => Navigator.push(
                         context,

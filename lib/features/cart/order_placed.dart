@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/providers/cart_notifier.dart';
+import '../../core/providers/profile_notifier.dart';
 import '../../core/theme.dart';
 import 'clinical_dispensing.dart';
 
@@ -11,15 +12,19 @@ class OrderPlaced extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartNotifier>();
+    final profile = context.watch<ProfileNotifier>();
+    final deliveryAddress = profile.address.isNotEmpty
+        ? profile.address
+        : 'Primary Delivery Location';
     return Scaffold(
       appBar: AppBar(
         title: const Column(
           children: [
             Text(
-              'ORDER AUTHORIZED',
+              'ORDER CONFIRMED',
               style: TextStyle(fontSize: 10, color: AppTheme.mutedText),
             ),
-            Text('#AC-884920'),
+            Text('Processing Order'),
           ],
         ),
         actions: [
@@ -70,14 +75,14 @@ class OrderPlaced extends StatelessWidget {
                 ),
               ),
               title: Text(
-                'FULFILLMENT HUB 04',
+                'FULFILLMENT PHARMACY',
                 style: TextStyle(fontSize: 11, color: AppTheme.mutedText),
               ),
               subtitle: Text(
-                'Bellandur Hub · 0.8 km away',
+                'Nearest Licensed Dispensary Hub',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
-              trailing: CircleAvatar(child: Text('SK')),
+              trailing: CircleAvatar(child: Icon(Icons.storefront_outlined, size: 18)),
             ),
           ),
           const SizedBox(height: 16),
@@ -118,18 +123,16 @@ class OrderPlaced extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           _card(
-            const ListTile(
-              leading: Icon(
+            ListTile(
+              leading: const Icon(
                 Icons.location_on_outlined,
                 color: AppTheme.primary,
               ),
-              title: Text(
+              title: const Text(
                 'Delivery Location · Home',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
-              subtitle: Text(
-                'Flat 402, Green Glen Layout, Bellandur, Bengaluru',
-              ),
+              subtitle: Text(deliveryAddress),
             ),
           ),
         ],

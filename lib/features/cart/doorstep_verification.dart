@@ -7,7 +7,7 @@ class DoorstepVerification extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('HealthRx · #AC-9941')),
+    appBar: AppBar(title: const Text('pharmaCustomer · #AC-9941')),
     body: ListView(
       padding: const EdgeInsets.all(20),
       children: [
@@ -15,20 +15,36 @@ class DoorstepVerification extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Row(
+              Row(
                 children: [
-                  Icon(Icons.circle, size: 12, color: AppTheme.primary),
-                  SizedBox(width: 8),
-                  Expanded(
+                  const Icon(Icons.circle, size: 10, color: AppTheme.primary),
+                  const SizedBox(width: 8),
+                  const Expanded(
                     child: Text(
                       'At Doorstep · Awaiting Verification',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 17,
+                        fontSize: 16,
                       ),
                     ),
                   ),
-                  Chip(label: Text('LIVE')),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceLow,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppTheme.primary),
+                    ),
+                    child: const Text(
+                      'LIVE',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.primaryDark,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
                 ],
               ),
               const ListTile(
@@ -159,14 +175,17 @@ class DoorstepVerification extends StatelessWidget {
     bottomNavigationBar: SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: ElevatedButton(
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute<void>(
-              builder: (_) => const DeliveryConfirmation(),
+        child: SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) => const DeliveryConfirmation(),
+              ),
             ),
+            child: const Text('Verify handover & continue'),
           ),
-          child: const Text('Verify handover & continue'),
         ),
       ),
     ),
