@@ -55,6 +55,11 @@ void main() {
   testWidgets('editing an address uses the same safe dialog close path', (
     tester,
   ) async {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     await tester.pumpWidget(_buildAddressTestApp());
     await tester.tap(find.byTooltip('Edit Home address'));
     await tester.pumpAndSettle();

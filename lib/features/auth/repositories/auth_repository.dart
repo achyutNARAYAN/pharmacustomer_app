@@ -80,7 +80,10 @@ class AuthRepository {
       // 4. Access token still valid (60s skew) -> authenticated
       if (!session.isExpired) {
         ApiService.setToken(session.accessToken);
-        if (session.userId.isNotEmpty && session.userId != 'u_customer') {
+        final tokenBizId = ApiService.currentCustomerId;
+        if (tokenBizId != null && tokenBizId.isNotEmpty) {
+          ApiService.setCustomerId(tokenBizId);
+        } else if (session.userId.isNotEmpty && session.userId != 'u_customer') {
           ApiService.setCustomerId(session.userId);
         }
         return RestoreResult(RestoreResultStatus.authenticated, session);

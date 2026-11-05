@@ -101,8 +101,11 @@ class _ProfileSetupState extends State<ProfileSetup> {
 
       final token = (res['token'] as String?) ?? ApiService.token;
       final custMap = (res['customer'] is Map ? res['customer'] : res) as Map<String, dynamic>?;
-      final rawMongoId = custMap?['_id'] as String? ?? custMap?['id'] as String? ?? custMap?['customerId'] as String? ?? '';
-      final customerId = rawMongoId;
+      final rawCustId = custMap?['customerId'] as String? ?? custMap?['_id'] as String? ?? custMap?['id'] as String? ?? '';
+      final customerId = rawCustId;
+      if (custMap != null) {
+        ApiService.setCachedCustomerProfile(custMap);
+      }
       if (customerId.isNotEmpty && customerId != 'u_customer') {
         ApiService.setCustomerId(customerId);
       }

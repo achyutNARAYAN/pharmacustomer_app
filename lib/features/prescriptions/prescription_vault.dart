@@ -1,8 +1,9 @@
- import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/services/api_service.dart';
 import '../../core/theme.dart';
+import '../auth/providers/auth_provider.dart';
 import '../home/search.dart';
 import 'prescription_review.dart';
 import 'prescription_upload_sheet.dart';
@@ -288,8 +289,10 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
       String rxId = 'rx_${DateTime.now().millisecondsSinceEpoch}';
       try {
         if (ApiService.token != null) {
+          final effectiveCustomerId = ApiService.currentCustomerId ??
+              (mounted ? context.read<AuthProvider?>()?.userId : null);
           final res = await ApiService.uploadPrescription(
-            customerId: (widget.patientId != null && widget.patientId!.isNotEmpty) ? widget.patientId! : ApiService.currentCustomerId,
+            customerId: effectiveCustomerId,
             patientName: widget.patientName.isNotEmpty ? widget.patientName : 'Customer',
             prescriptionDate: DateTime.now(),
             documentUrl: file.path ?? 'https://res.cloudinary.com/demo/sample_rx.pdf',
@@ -313,6 +316,7 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
             fileName: file.name,
             mime: file.extension ?? 'image/jpeg',
             sizeBytes: file.size,
+            remoteUrl: file.path,
             createdAt: DateTime.now(),
             updatedAt: DateTime.now(),
           ),

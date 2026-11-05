@@ -1,11 +1,19 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/theme.dart';
-import '../../../core/utils/prescription_uploader.dart';
+import '../../prescriptions/prescription_upload_sheet.dart';
 
 /// Full-width teal banner prompting the user to upload a prescription.
 class PrescriptionBanner extends StatelessWidget {
-  const PrescriptionBanner({super.key});
+  final ValueChanged<PlatformFile>? onUploadSelected;
+
+  const PrescriptionBanner({super.key, this.onUploadSelected});
+
+  Future<void> _openUpload(BuildContext context) async {
+    final file = await showPrescriptionUploadSheet(context);
+    if (file != null) onUploadSelected?.call(file);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,7 +47,7 @@ class PrescriptionBanner extends StatelessWidget {
             ),
           ),
           ElevatedButton.icon(
-            onPressed: () => pickPrescription(context),
+            onPressed: () => _openUpload(context),
             icon: const Icon(Icons.upload_file, size: 16, color: AppTheme.primary),
             label: const Text('Upload Req',
                 style: TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.bold)),

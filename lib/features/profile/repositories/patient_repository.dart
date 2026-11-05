@@ -12,6 +12,8 @@ class ApiServicePatientRepository implements PatientRepository {
   final String selfName;
   final List<PatientProfile> _cachedProfiles = [];
 
+  List<PatientProfile> get cachedProfiles => List.unmodifiable(_cachedProfiles);
+
   ApiServicePatientRepository(this.selfName) {
     _cachedProfiles.add(
       PatientProfile(
@@ -24,6 +26,32 @@ class ApiServicePatientRepository implements PatientRepository {
         lastUpdated: DateTime.now(),
       ),
     );
+    final cached = ApiService.cachedCustomerProfile;
+    if (cached != null) {
+      final cust = (cached['customer'] is Map ? cached['customer'] : cached) as Map<String, dynamic>;
+      final members = (cust['familyMembers'] as List<dynamic>? ?? []);
+      _appendMembers(members);
+    }
+  }
+
+  void _appendMembers(List<dynamic> members) {
+    for (final m in members) {
+      if (m is Map) {
+        final id = m['_id'] as String? ?? m['id'] as String? ?? '';
+        final name = m['fullName'] as String? ?? m['name'] as String? ?? '';
+        if (name.isNotEmpty && !_cachedProfiles.any((p) => (id.isNotEmpty && p.id == id) || p.name == name)) {
+          _cachedProfiles.add(
+            PatientProfile(
+              id: id.isNotEmpty ? id : DateTime.now().microsecondsSinceEpoch.toString(),
+              name: name,
+              relation: _parseRelation(m['relationship'] as String?),
+              gender: m['gender'] as String? ?? '',
+              lastUpdated: DateTime.now(),
+            ),
+          );
+        }
+      }
+    }
   }
 
   @override
@@ -32,21 +60,9 @@ class ApiServicePatientRepository implements PatientRepository {
       if (ApiService.token != null) {
         final data = await ApiService.getCustomerProfile();
         if (data != null) {
-          final members = (data['familyMembers'] as List<dynamic>? ?? []);
-          for (final m in members) {
-            final id = m['_id'] as String? ?? m['id'] as String? ?? '';
-            if (!_cachedProfiles.any((p) => p.id == id)) {
-              _cachedProfiles.add(
-                PatientProfile(
-                  id: id,
-                  name: m['fullName'] as String? ?? '',
-                  relation: _parseRelation(m['relationship'] as String?),
-                  gender: m['gender'] as String? ?? '',
-                  lastUpdated: DateTime.now(),
-                ),
-              );
-            }
-          }
+          final cust = (data['customer'] is Map ? data['customer'] : data) as Map<String, dynamic>;
+          final members = (cust['familyMembers'] as List<dynamic>? ?? []);
+          _appendMembers(members);
         }
       }
     } catch (_) {
@@ -72,15 +88,36 @@ class ApiServicePatientRepository implements PatientRepository {
     _cachedProfiles.add(profile);
     try {
       if (ApiService.token != null) {
+        final relStr = switch (profile.relation) {
+          PatientRelation.self => 'SELF',
+          PatientRelation.father => 'FATHER',
+          PatientRelation.mother => 'MOTHER',
+          PatientRelation.son => 'SON',
+          PatientRelation.daughter => 'DAUGHTER',
+          PatientRelation.other => 'OTHER',
+        };
+        final genStr = switch (profile.gender.trim().toUpperCase()) {
+          'MALE' || 'M' => 'MALE',
+          'FEMALE' || 'F' => 'FEMALE',
+          'PREFER_NOT_TO_SAY' => 'PREFER_NOT_TO_SAY',
+          _ => 'OTHER',
+        };
+        final dob = profile.dob ?? DateTime.now().subtract(const Duration(days: 365 * 30));
+        final dobStr = dob.toUtc().toIso8601String();
+
         await ApiService.addFamilyMember(
           ApiService.currentCustomerId,
           fullName: profile.name,
-          relationship: profile.relation.label,
-          age: profile.dob != null
-              ? (DateTime.now().year - profile.dob!.year)
-              : 30,
-          gender: profile.gender.isNotEmpty ? profile.gender : 'Other',
+          relation: relStr,
+          gender: genStr,
+          dateOfBirth: dobStr,
         );
+        final fresh = await ApiService.getCustomerProfile();
+        if (fresh != null) {
+          final cust = (fresh['customer'] is Map ? fresh['customer'] : fresh) as Map<String, dynamic>;
+          final members = (cust['familyMembers'] as List<dynamic>? ?? []);
+          _appendMembers(members);
+        }
       }
     } catch (_) {}
   }

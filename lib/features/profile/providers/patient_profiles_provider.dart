@@ -4,23 +4,46 @@ import '../models/patient_profile.dart';
 import '../repositories/patient_repository.dart';
 
 class PatientProfilesProvider extends ChangeNotifier {
-  PatientProfilesProvider(this.repository);
+  PatientProfilesProvider(this.repository) {
+    if (repository is ApiServicePatientRepository) {
+      final initial = (repository as ApiServicePatientRepository).cachedProfiles;
+      if (initial.isNotEmpty) {
+        profiles = initial;
+        loading = false;
+      }
+    }
+  }
   final PatientRepository repository;
   List<PatientProfile> profiles = const [];
   bool loading = true;
   String? error;
+  bool _disposed = false;
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
+  void _safeNotify() {
+    if (!_disposed) {
+      notifyListeners();
+    }
+  }
 
   Future<void> refresh() async {
-    loading = true;
+    if (profiles.isEmpty) {
+      loading = true;
+      _safeNotify();
+    }
     error = null;
-    notifyListeners();
     try {
       profiles = await repository.getProfiles();
     } catch (_) {
       error = 'We couldn’t load patient profiles.';
     }
     loading = false;
-    notifyListeners();
+    _safeNotify();
   }
 
   Future<void> save(PatientProfile profile, {bool add = false}) async {

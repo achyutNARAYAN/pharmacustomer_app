@@ -24,8 +24,7 @@ abstract final class AppStrings {
   // ── Medicine detail ───────────────────────────────────────────────────────
   static const String medicineDetails = 'Medicine Details';
   static const String prescriptionRequired = 'Prescription Required (Rx)';
-  static const String prescriptionBody =
-      'A valid prescription from a registered medical practitioner is mandatory '
+  static const String prescriptionBody = 'A valid prescription from a registered medical practitioner is mandatory '
       'for this medicine. You can upload it during checkout or consult our in-house doctor.';
   static const String doctorVerified = '100% Doctor Verified';
   static const String uploadAndOrder = 'Upload Prescription & Order';

@@ -8,6 +8,8 @@ import '../auth/login.dart';
 import '../auth/providers/auth_provider.dart';
 import '../orders/order_history.dart';
 import '../prescriptions/prescription_vault.dart';
+import 'customer_address_screen.dart';
+import 'providers/customer_address_provider.dart';
 import 'saved_patient_profiles_screen.dart';
 
 class ProfileHome extends StatelessWidget {
@@ -28,7 +30,16 @@ class ProfileHome extends StatelessWidget {
   final VoidCallback onEdit;
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) {
+    CustomerAddressProvider? addressProvider;
+    try {
+      addressProvider = Provider.of<CustomerAddressProvider>(context);
+    } catch (_) {}
+    final resolvedAddress = address.isNotEmpty
+        ? address
+        : (addressProvider?.defaultAddress?.displayDetails ?? '');
+
+    return Scaffold(
     backgroundColor: AppTheme.background,
     appBar: AppBar(
       automaticallyImplyLeading: false,
@@ -110,10 +121,10 @@ class ProfileHome extends StatelessWidget {
                           icon: Icons.mail_outline_rounded,
                           text: email,
                         ),
-                      if (address.isNotEmpty)
+                      if (resolvedAddress.isNotEmpty)
                         _ProfileDetail(
                           icon: Icons.location_on_outlined,
-                          text: address,
+                          text: resolvedAddress,
                         ),
                     ],
                   ),
@@ -138,42 +149,6 @@ class ProfileHome extends StatelessWidget {
         ),
         const SizedBox(height: 26),
         const _SectionTitle(
-          'Your health',
-          subtitle: 'Important details for safer care',
-        ),
-        const SizedBox(height: 12),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final cards = [
-              const _HealthCard(
-                icon: Icons.monitor_heart_outlined,
-                color: AppTheme.primary,
-                label: 'CHRONIC CONDITION',
-                value: 'Diabetes',
-              ),
-              const _HealthCard(
-                icon: Icons.warning_amber_rounded,
-                color: AppTheme.warningText,
-                label: 'KNOWN ALLERGY',
-                value: 'Penicillin sensitivity',
-              ),
-            ];
-            if (constraints.maxWidth < 380) {
-              return Column(
-                children: [cards[0], const SizedBox(height: 10), cards[1]],
-              );
-            }
-            return Row(
-              children: [
-                Expanded(child: cards[0]),
-                const SizedBox(width: 10),
-                Expanded(child: cards[1]),
-              ],
-            );
-          },
-        ),
-        const SizedBox(height: 26),
-        const _SectionTitle(
           'Account',
           subtitle: 'Manage your care in one place',
         ),
@@ -191,6 +166,21 @@ class ProfileHome extends StatelessWidget {
                     builder: (_) => SavedPatientProfilesScreen(
                       userName: name,
                       profileImagePath: profileImagePath,
+                    ),
+                  ),
+                ),
+              ),
+              const Divider(height: 1, indent: 64),
+              _AccountRow(
+                icon: Icons.location_on_outlined,
+                title: 'Customer address management',
+                subtitle: 'Manage HOME, WORK, OTHER delivery addresses',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => CustomerAddressManagementScreen(
+                      userName: name,
+                      userPhone: phoneNumber,
                     ),
                   ),
                 ),
@@ -233,6 +223,7 @@ class ProfileHome extends StatelessWidget {
       ],
     ),
   );
+  }
 
   Future<void> _confirmLogout(BuildContext context) async {
     final confirmed = await showDialog<bool>(
@@ -321,67 +312,6 @@ class _ProfileDetail extends StatelessWidget {
           ),
         ),
       ],
-    ),
-  );
-}
-
-class _HealthCard extends StatelessWidget {
-  const _HealthCard({
-    required this.icon,
-    required this.color,
-    required this.label,
-    required this.value,
-  });
-  final IconData icon;
-  final Color color;
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) => _panel(
-    Container(
-      decoration: BoxDecoration(color: color.withValues(alpha: .045)),
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: .1),
-              borderRadius: BorderRadius.circular(13),
-            ),
-            child: Icon(icon, color: color, size: 22),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.mutedText,
-                    letterSpacing: .5,
-                  ),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    height: 1.25,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     ),
   );
 }

@@ -19,6 +19,8 @@ import 'features/orders/providers/orders_provider.dart';
 import 'features/orders/repositories/orders_repository.dart';
 import 'features/prescriptions/providers/prescription_provider.dart';
 import 'features/prescriptions/repositories/prescription_repository.dart';
+import 'features/profile/providers/customer_address_provider.dart';
+import 'features/profile/repositories/address_repository.dart';
 import 'features/profile/repositories/profile_repository.dart';
 import 'core/services/api_service.dart';
 import 'app/app.dart';
@@ -193,6 +195,10 @@ class _BootstrapGateState extends State<BootstrapGate> {
         ChangeNotifierProxyProvider<AuthProvider, PrescriptionProvider>(
           create: (_) => PrescriptionProvider(deps.prescriptionRepository),
           update: (_, auth, rx) => rx!..bindUser(auth.userId),
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, CustomerAddressProvider>(
+          create: (_) => CustomerAddressProvider(ApiServiceAddressRepository()),
+          update: (_, auth, addr) => addr!..bindUser(auth.userId),
         ),
       ],
       child: const App(),

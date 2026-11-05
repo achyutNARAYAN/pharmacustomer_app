@@ -12,23 +12,81 @@ class ApiService {
   static AppLogger? logger;
   static String? _authToken;
   static String? _currentCustomerId;
+  static Map<String, dynamic>? _cachedCustomerProfile;
 
   static void setHttpClient(http.Client client) {
     _client = client;
   }
 
+  static String? _extractBusinessCustomerId([String? tokenToParse]) {
+    final t = tokenToParse ?? _authToken;
+    if (t == null || t.isEmpty) return null;
+    try {
+      final parts = t.split('.');
+      if (parts.length == 3) {
+        final payload = parts[1];
+        final normalized = base64Url.normalize(payload);
+        final decoded = utf8.decode(base64Url.decode(normalized));
+        final data = jsonDecode(decoded) as Map<String, dynamic>;
+        final custId = data['customerId'] as String?;
+        if (custId != null && custId.isNotEmpty) {
+          return custId;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
   static void setCustomerId(String? id) {
     if (id != null && id.isNotEmpty && id != 'me' && id != 'u_customer') {
-      _currentCustomerId = id;
+      final bizId = _extractBusinessCustomerId();
+      // If we already have a business customer ID (e.g. CUST-2026-0003), do not overwrite it with a 24-hex Mongo ID
+      if (bizId != null && RegExp(r'^[0-9a-fA-F]{24}$').hasMatch(id)) {
+        _currentCustomerId = bizId;
+      } else {
+        _currentCustomerId = id;
+      }
     }
   }
 
-  static String? get currentCustomerId => _currentCustomerId;
+  static String? get currentCustomerId {
+    final bizId = _extractBusinessCustomerId() ?? _cachedCustomerProfile?['customerId'] as String?;
+    if (bizId != null && bizId.isNotEmpty) {
+      return bizId;
+    }
+    return _currentCustomerId;
+  }
+
+  static Map<String, dynamic>? get cachedCustomerProfile => _cachedCustomerProfile;
+
+  static void setCachedCustomerProfile(Map<String, dynamic>? profile) {
+    _cachedCustomerProfile = profile;
+    if (profile != null) {
+      final custId = profile['customerId'] as String? ?? profile['_id'] as String? ?? profile['id'] as String?;
+      if (custId != null && custId.isNotEmpty) {
+        setCustomerId(custId);
+      }
+    }
+  }
 
   static String _resolveCustomerId(String? id) {
+    final tokenBizId = _extractBusinessCustomerId();
+    final cacheBizId = _cachedCustomerProfile?['customerId'] as String?;
+    final canonicalBizId = tokenBizId ?? cacheBizId;
+
     if (id != null && id.isNotEmpty && id != 'me' && id != 'u_customer') {
+      // If a 24-character MongoDB hex ID is passed, but we know the business customerId (CUST-...),
+      // use the canonical business customer ID!
+      if (canonicalBizId != null && RegExp(r'^[0-9a-fA-F]{24}$').hasMatch(id)) {
+        return canonicalBizId;
+      }
       return id;
     }
+
+    if (canonicalBizId != null && canonicalBizId.isNotEmpty) {
+      return canonicalBizId;
+    }
+
     final cur = _currentCustomerId;
     if (cur != null && cur.isNotEmpty && cur != 'me' && cur != 'u_customer') {
       return cur;
@@ -39,23 +97,28 @@ class ApiService {
   static void setToken(String? token) {
     _authToken = token;
     if (token != null && token.isNotEmpty) {
-      try {
-        final parts = token.split('.');
-        if (parts.length == 3) {
-          final payload = parts[1];
-          final normalized = base64Url.normalize(payload);
-          final decoded = utf8.decode(base64Url.decode(normalized));
-          final data = jsonDecode(decoded) as Map<String, dynamic>;
-          final extractedId = data['_id'] as String? ??
-              data['id'] as String? ??
-              data['userId'] as String? ??
-              data['customerId'] as String? ??
-              data['sub'] as String?;
-          if (extractedId != null && extractedId.isNotEmpty && extractedId != 'me') {
-            _currentCustomerId = extractedId;
+      final bizId = _extractBusinessCustomerId(token);
+      if (bizId != null && bizId.isNotEmpty) {
+        _currentCustomerId = bizId;
+      } else {
+        try {
+          final parts = token.split('.');
+          if (parts.length == 3) {
+            final payload = parts[1];
+            final normalized = base64Url.normalize(payload);
+            final decoded = utf8.decode(base64Url.decode(normalized));
+            final data = jsonDecode(decoded) as Map<String, dynamic>;
+            final extractedId = data['customerId'] as String? ??
+                data['_id'] as String? ??
+                data['id'] as String? ??
+                data['userId'] as String? ??
+                data['sub'] as String?;
+            if (extractedId != null && extractedId.isNotEmpty && extractedId != 'me') {
+              _currentCustomerId = extractedId;
+            }
           }
-        }
-      } catch (_) {}
+        } catch (_) {}
+      }
     } else {
       _currentCustomerId = null;
     }
@@ -343,9 +406,12 @@ class ApiService {
         setToken(tokenStr);
       }
       final cust = res['customer'] as Map<String, dynamic>?;
-      final rawMongoId = cust?['_id'] as String? ?? cust?['id'] as String?;
-      if (rawMongoId != null && rawMongoId.isNotEmpty) {
-        setCustomerId(rawMongoId);
+      if (cust != null) {
+        setCachedCustomerProfile(cust);
+      }
+      final custId = cust?['customerId'] as String? ?? cust?['_id'] as String? ?? cust?['id'] as String?;
+      if (custId != null && custId.isNotEmpty) {
+        setCustomerId(custId);
       }
       return res;
     }
@@ -381,9 +447,12 @@ class ApiService {
       final cust = (res['customer'] is Map
           ? res['customer']
           : (res['data'] is Map ? res['data'] : res)) as Map<String, dynamic>?;
-      final rawMongoId = cust?['_id'] as String? ?? cust?['id'] as String?;
-      if (rawMongoId != null && rawMongoId.isNotEmpty) {
-        setCustomerId(rawMongoId);
+      if (cust != null) {
+        setCachedCustomerProfile(cust);
+      }
+      final custId = cust?['customerId'] as String? ?? cust?['_id'] as String? ?? cust?['id'] as String?;
+      if (custId != null && custId.isNotEmpty) {
+        setCustomerId(custId);
       }
       return res;
     }
@@ -424,9 +493,24 @@ class ApiService {
   /// Get full customer profile (Includes addresses & family members)
   static Future<Map<String, dynamic>?> getCustomerProfile([String? customerId]) async {
     final targetId = _resolveCustomerId(customerId);
-    if (targetId.isEmpty) return null;
-    final res = await get(ApiConstants.customerProfile(targetId));
-    return res is Map<String, dynamic> ? res : null;
+    if (targetId.isEmpty) return _cachedCustomerProfile;
+    try {
+      final res = await get(ApiConstants.customerProfile(targetId));
+      if (res is Map<String, dynamic>) {
+        final cust = res['customer'] is Map<String, dynamic>
+            ? res['customer'] as Map<String, dynamic>
+            : (res['data'] is Map<String, dynamic>
+                ? (res['data']['customer'] is Map<String, dynamic>
+                    ? res['data']['customer'] as Map<String, dynamic>
+                    : res['data'] as Map<String, dynamic>)
+                : res);
+        setCachedCustomerProfile(cust);
+        return cust;
+      }
+    } catch (_) {
+      if (_cachedCustomerProfile != null) return _cachedCustomerProfile;
+    }
+    return _cachedCustomerProfile;
   }
 
   /// Update primary customer profile
@@ -535,21 +619,89 @@ class ApiService {
     return await delete(ApiConstants.customerAddressDetail(targetId, addressId));
   }
 
+  /// Get all saved delivery addresses for a customer
+  static Future<List<Map<String, dynamic>>> getAddresses([String? customerId]) async {
+    final targetId = _resolveCustomerId(customerId);
+    if (targetId.isNotEmpty) {
+      try {
+        final res = await get(ApiConstants.customerAddresses(targetId));
+        if (res is List) {
+          return res.whereType<Map<String, dynamic>>().toList();
+        } else if (res is Map && res['addresses'] is List) {
+          return (res['addresses'] as List).whereType<Map<String, dynamic>>().toList();
+        }
+      } catch (_) {}
+
+      try {
+        final profile = await getCustomerProfile(targetId);
+        if (profile != null) {
+          final cust = (profile['customer'] is Map ? profile['customer'] : profile) as Map<String, dynamic>;
+          if (cust['addresses'] is List) {
+            return (cust['addresses'] as List).whereType<Map<String, dynamic>>().toList();
+          }
+        }
+      } catch (_) {}
+    }
+
+    final cached = _cachedCustomerProfile;
+    if (cached != null) {
+      final cust = (cached['customer'] is Map ? cached['customer'] : cached) as Map<String, dynamic>;
+      if (cust['addresses'] is List) {
+        return (cust['addresses'] as List).whereType<Map<String, dynamic>>().toList();
+      }
+    }
+    return [];
+  }
+
   /// Add family patient profile for prescription attachment
   static Future<dynamic> addFamilyMember(
     String? customerId, {
     required String fullName,
-    required String relationship,
-    required int age,
-    required String gender,
+    String? relation,
+    String? relationship,
+    String? gender,
+    String? dateOfBirth,
+    int? age,
   }) async {
     final targetId = _resolveCustomerId(customerId);
     if (targetId.isEmpty) return null;
+
+    final rawRel = (relation ?? relationship ?? 'OTHER').trim().toUpperCase();
+    final validRel = switch (rawRel) {
+      'SELF' => 'SELF',
+      'SPOUSE' => 'SPOUSE',
+      'FATHER' => 'FATHER',
+      'MOTHER' => 'MOTHER',
+      'SON' => 'SON',
+      'DAUGHTER' => 'DAUGHTER',
+      _ => 'OTHER',
+    };
+
+    final rawGen = (gender ?? 'OTHER').trim().toUpperCase();
+    final validGen = switch (rawGen) {
+      'MALE' || 'M' => 'MALE',
+      'FEMALE' || 'F' => 'FEMALE',
+      'PREFER_NOT_TO_SAY' => 'PREFER_NOT_TO_SAY',
+      _ => 'OTHER',
+    };
+
+    String dob = dateOfBirth ?? '';
+    if (dob.isEmpty) {
+      final yearsAgo = age ?? 30;
+      final calcDate = DateTime.now().subtract(Duration(days: 365 * yearsAgo));
+      dob = calcDate.toUtc().toIso8601String();
+    } else {
+      try {
+        final parsed = DateTime.parse(dob);
+        dob = parsed.toUtc().toIso8601String();
+      } catch (_) {}
+    }
+
     final body = {
       'fullName': fullName,
-      'relationship': relationship,
-      'age': age,
-      'gender': gender,
+      'relation': validRel,
+      'gender': validGen,
+      'dateOfBirth': dob,
     };
     return await post(ApiConstants.customerFamilyMembers(targetId), body: body);
   }

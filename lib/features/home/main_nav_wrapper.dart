@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -12,6 +13,8 @@ import '../prescriptions/prescription_vault.dart';
 import '../orders/order_history.dart';
 import '../profile/profile_home.dart';
 import '../profile/profile_edit.dart';
+import '../profile/providers/customer_address_provider.dart';
+import '../prescriptions/prescription_review.dart';
 
 class MainNavWrapper extends StatefulWidget {
   final String name;
@@ -76,6 +79,16 @@ class _MainNavWrapperState extends State<MainNavWrapper> {
     }
   }
 
+  Future<void> _reviewHomePrescription(PlatformFile file) async {
+    setState(() => _currentIndex = 3);
+    await Navigator.of(context).push<void>(MaterialPageRoute(
+      builder: (_) => PrescriptionReview(
+        file: file,
+        patientName: context.read<ProfileNotifier>().name,
+      ),
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
     final profile = context.watch<ProfileNotifier>();
@@ -84,7 +97,14 @@ class _MainNavWrapperState extends State<MainNavWrapper> {
       body: IndexedStack(
         index: _currentIndex,
         children: [
-          Home(name: profile.name, location: profile.address, profileImagePath: profile.profileImagePath),
+          Consumer<CustomerAddressProvider>(
+            builder: (_, addresses, _) => Home(
+              name: profile.name,
+              location: addresses.defaultAddress?.displayDetails ?? profile.address,
+              profileImagePath: profile.profileImagePath,
+              onPrescriptionUpload: _reviewHomePrescription,
+            ),
+          ),
           Search(onBack: () => setState(() => _currentIndex = 0)),
           const OrderHistory(),
           PrescriptionVault(

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
@@ -13,7 +14,8 @@ class Home extends StatelessWidget {
   final String name;
   final String location;
   final String? profileImagePath;
-  const Home({super.key, required this.name, this.location = 'Set delivery location', this.profileImagePath});
+  final ValueChanged<PlatformFile>? onPrescriptionUpload;
+  const Home({super.key, required this.name, this.location = 'Set delivery location', this.profileImagePath, this.onPrescriptionUpload});
 
   // ── Time-of-day greeting ───────────────────────────────────────────────────
   String get _greeting {
@@ -39,7 +41,7 @@ class Home extends StatelessWidget {
             const SizedBox(height: 16),
             _searchBar(context),
             const SizedBox(height: 22),
-            const PrescriptionBanner(),
+            PrescriptionBanner(onUploadSelected: onPrescriptionUpload),
             const SizedBox(height: 28),
             _browseByConcernHeader(context),
             const SizedBox(height: 14),

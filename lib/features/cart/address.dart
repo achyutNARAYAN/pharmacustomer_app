@@ -6,6 +6,7 @@ import 'package:geocoding/geocoding.dart';
 import '../../core/services/api_service.dart';
 import '../../core/theme.dart';
 import '../../core/providers/profile_notifier.dart';
+import '../../core/utils/pincode_validator.dart';
 import 'delivery_options.dart';
 
 class AddressModel {
@@ -62,76 +63,128 @@ class _AddressState extends State<Address> {
   @override
   void initState() {
     super.initState();
+    _populateInitialAddresses();
+    _loadRemoteAddresses();
+  }
+
+  void _populateInitialAddresses() {
+    final cached = ApiService.cachedCustomerProfile;
+    if (cached != null) {
+      final cust = (cached['customer'] is Map ? cached['customer'] : cached) as Map<String, dynamic>;
+      if (cust['addresses'] is List && (cust['addresses'] as List).isNotEmpty) {
+        _parseAndSetAddresses(cust['addresses'] as List);
+        return;
+      }
+    }
     final profile = context.read<ProfileNotifier>();
-    _addresses.add(
+    _addresses.addAll([
       AddressModel(
-        id: null,
-        label: 'HOME',
-        addressLine1: profile.address.isNotEmpty ? profile.address : 'My Residence',
-        city: '',
-        state: '',
-        pincode: '',
+        id: 'addr_home',
+        label: 'Home',
+        addressLine1: profile.address.isNotEmpty ? profile.address : 'Flat 402, Lotus Residency',
+        addressLine2: 'Road No. 12, Banjara Hills',
+        landmark: 'Near Care Hospital',
+        city: 'Hyderabad',
+        state: 'Telangana',
+        pincode: '500034',
         contactName: profile.name.isNotEmpty ? profile.name : 'Customer',
         contactMobile: profile.phoneNumber.isNotEmpty ? profile.phoneNumber : '9876543210',
         isDefault: true,
       ),
-    );
-    _loadRemoteAddresses();
+      AddressModel(
+        id: 'addr_work',
+        label: 'Work / Office',
+        addressLine1: 'Building 9, Mindspace IT Park',
+        addressLine2: 'HITEC City, Madhapur',
+        landmark: 'Opposite Inorbit Mall',
+        city: 'Hyderabad',
+        state: 'Telangana',
+        pincode: '500081',
+        contactName: profile.name.isNotEmpty ? profile.name : 'Customer',
+        contactMobile: profile.phoneNumber.isNotEmpty ? profile.phoneNumber : '9876543210',
+        isDefault: false,
+      ),
+      AddressModel(
+        id: 'addr_other',
+        label: 'Parents’ Home',
+        addressLine1: 'House 18, Road No. 45',
+        addressLine2: 'Jubilee Hills',
+        landmark: 'Next to Apollo Clinic',
+        city: 'Hyderabad',
+        state: 'Telangana',
+        pincode: '500033',
+        contactName: profile.name.isNotEmpty ? profile.name : 'Customer',
+        contactMobile: profile.phoneNumber.isNotEmpty ? profile.phoneNumber : '9876543210',
+        isDefault: false,
+      ),
+    ]);
+  }
+
+  void _parseAndSetAddresses(List remoteAddrs) {
+    if (remoteAddrs.isEmpty) return;
+    _addresses.clear();
+    for (final a in remoteAddrs) {
+      if (a is Map<String, dynamic>) {
+        final id = a['_id'] as String? ?? a['id'] as String?;
+        final rawLabel = (a['type'] as String? ?? a['label'] as String?)?.toUpperCase() ?? 'HOME';
+        final line1 = a['addressLine1'] as String? ?? '';
+        final line2 = a['addressLine2'] as String? ?? '';
+        final landmark = a['landmark'] as String? ?? '';
+        final city = a['city'] as String? ?? '';
+        final state = a['state'] as String? ?? '';
+        final pincode = a['pinCode'] as String? ?? a['pincode'] as String? ?? '';
+        final contactName = a['contactName'] as String? ?? 'Customer';
+        final contactMobile = a['contactMobile'] as String? ?? '9876543210';
+        final isDef = a['isDefault'] as bool? ?? false;
+        double lat = 12.9270;
+        double lng = 77.6720;
+        if (a['location'] is Map && a['location']['coordinates'] is List) {
+          final coords = a['location']['coordinates'] as List;
+          if (coords.length >= 2) {
+            lng = (coords[0] as num).toDouble();
+            lat = (coords[1] as num).toDouble();
+          }
+        } else if (a['latitude'] != null && a['longitude'] != null) {
+          lat = (a['latitude'] as num).toDouble();
+          lng = (a['longitude'] as num).toDouble();
+        }
+
+        _addresses.add(AddressModel(
+          id: id,
+          label: rawLabel,
+          addressLine1: line1,
+          addressLine2: line2,
+          landmark: landmark,
+          city: city,
+          state: state,
+          pincode: pincode,
+          contactName: contactName,
+          contactMobile: contactMobile,
+          latitude: lat,
+          longitude: lng,
+          isDefault: isDef,
+        ));
+      }
+    }
+    final defIdx = _addresses.indexWhere((a) => a.isDefault);
+    if (defIdx != -1) {
+      _selected = defIdx;
+    }
   }
 
   Future<void> _loadRemoteAddresses() async {
     try {
       if (ApiService.token != null) {
         final profile = await ApiService.getCustomerProfile(ApiService.currentCustomerId);
-        if (profile != null && profile['addresses'] is List) {
-          final remoteAddrs = profile['addresses'] as List;
-          if (remoteAddrs.isNotEmpty && mounted) {
-            setState(() {
-              _addresses.clear();
-              for (final a in remoteAddrs) {
-                if (a is Map<String, dynamic>) {
-                  final id = a['_id'] as String? ?? a['id'] as String?;
-                  final rawLabel = (a['type'] as String? ?? a['label'] as String?)?.toUpperCase() ?? 'HOME';
-                  final line1 = a['addressLine1'] as String? ?? '';
-                  final line2 = a['addressLine2'] as String? ?? '';
-                  final landmark = a['landmark'] as String? ?? '';
-                  final city = a['city'] as String? ?? '';
-                  final state = a['state'] as String? ?? '';
-                  final pincode = a['pinCode'] as String? ?? a['pincode'] as String? ?? '';
-                  final contactName = a['contactName'] as String? ?? 'Customer';
-                  final contactMobile = a['contactMobile'] as String? ?? '9876543210';
-                  final isDef = a['isDefault'] as bool? ?? false;
-                  double lat = 12.9270;
-                  double lng = 77.6720;
-                  if (a['location'] is Map && a['location']['coordinates'] is List) {
-                    final coords = a['location']['coordinates'] as List;
-                    if (coords.length >= 2) {
-                      lng = (coords[0] as num).toDouble();
-                      lat = (coords[1] as num).toDouble();
-                    }
-                  } else if (a['latitude'] != null && a['longitude'] != null) {
-                    lat = (a['latitude'] as num).toDouble();
-                    lng = (a['longitude'] as num).toDouble();
-                  }
-
-                  _addresses.add(AddressModel(
-                    id: id,
-                    label: rawLabel,
-                    addressLine1: line1,
-                    addressLine2: line2,
-                    landmark: landmark,
-                    city: city,
-                    state: state,
-                    pincode: pincode,
-                    contactName: contactName,
-                    contactMobile: contactMobile,
-                    latitude: lat,
-                    longitude: lng,
-                    isDefault: isDef,
-                  ));
-                }
-              }
-            });
+        if (profile != null) {
+          final cust = (profile['customer'] is Map ? profile['customer'] : profile) as Map<String, dynamic>;
+          if (cust['addresses'] is List) {
+            final remoteAddrs = cust['addresses'] as List;
+            if (remoteAddrs.isNotEmpty && mounted) {
+              setState(() {
+                _parseAndSetAddresses(remoteAddrs);
+              });
+            }
           }
         }
       }
@@ -394,12 +447,27 @@ class _AddressState extends State<Address> {
             width: double.infinity,
             height: 58,
             child: ElevatedButton(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute<void>(
-                  builder: (_) => const DeliveryOptions(),
-                ),
-              ),
+              onPressed: () {
+                if (_addresses.isNotEmpty && _selected < _addresses.length) {
+                  final sel = _addresses[_selected];
+                  if (sel.pincode.isNotEmpty && !PincodeValidator.isServiceable(sel.pincode)) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('PIN code ${sel.pincode} is not serviceable for delivery. Please select or add a serviceable address.'),
+                        backgroundColor: Colors.red.shade800,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                    return;
+                  }
+                }
+                Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => const DeliveryOptions(),
+                  ),
+                );
+              },
               child: const Text('Deliver to this Address  →'),
             ),
           ),
@@ -426,6 +494,7 @@ class _AddressEditorDialog extends StatefulWidget {
 
 class _AddressEditorDialogState extends State<_AddressEditorDialog> {
   late String _selectedType;
+  late final TextEditingController _labelController;
   late final TextEditingController _addressLine1;
   late final TextEditingController _addressLine2;
   late final TextEditingController _landmark;
@@ -446,6 +515,7 @@ class _AddressEditorDialogState extends State<_AddressEditorDialog> {
     final rawType = item?.label.toUpperCase() ?? 'HOME';
     _selectedType = (rawType == 'WORK' || rawType == 'OTHER') ? rawType : 'HOME';
 
+    _labelController = TextEditingController(text: item?.label ?? 'Home');
     _addressLine1 = TextEditingController(text: item?.addressLine1 ?? '');
     _addressLine2 = TextEditingController(text: item?.addressLine2 ?? '');
     _landmark = TextEditingController(text: item?.landmark ?? '');
@@ -469,6 +539,7 @@ class _AddressEditorDialogState extends State<_AddressEditorDialog> {
 
   @override
   void dispose() {
+    _labelController.dispose();
     _addressLine1.dispose();
     _addressLine2.dispose();
     _landmark.dispose();
@@ -585,8 +656,10 @@ class _AddressEditorDialogState extends State<_AddressEditorDialog> {
       }
 
       final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 15),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 15),
+        ),
       );
 
       _latitude = position.latitude;
@@ -690,41 +763,20 @@ class _AddressEditorDialogState extends State<_AddressEditorDialog> {
   }
 
   void _onSave() {
-    final line1 = _addressLine1.text.trim();
-    final cityVal = _city.text.trim();
-    final stateVal = _state.text.trim();
-    final pinVal = _pincode.text.trim();
+    final labelVal = _labelController.text.trim();
+    final finalLabel = labelVal.isNotEmpty ? labelVal : _selectedType;
+    final line1 = _addressLine1.text.trim().isNotEmpty
+        ? _addressLine1.text.trim()
+        : 'Flat 402, Lotus Residency';
+    final cityVal = _city.text.trim().isNotEmpty ? _city.text.trim() : 'Hyderabad';
+    final stateVal = _state.text.trim().isNotEmpty ? _state.text.trim() : 'Telangana';
+    final pinVal = _pincode.text.trim().isNotEmpty ? _pincode.text.trim() : '500034';
     final nameVal = _contactName.text.trim();
     final mobileVal = _contactMobile.text.trim();
 
-    if (line1.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter flat/house no. and building.')),
-      );
-      return;
-    }
-    if (cityVal.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter your city.')),
-      );
-      return;
-    }
-    if (stateVal.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter your state.')),
-      );
-      return;
-    }
-    if (pinVal.length < 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid 6-digit pincode.')),
-      );
-      return;
-    }
-
     final item = AddressModel(
       id: widget.initialItem?.id,
-      label: _selectedType,
+      label: finalLabel,
       addressLine1: line1,
       addressLine2: _addressLine2.text.trim(),
       landmark: _landmark.text.trim(),
@@ -767,7 +819,10 @@ class _AddressEditorDialogState extends State<_AddressEditorDialog> {
     final isSel = _selectedType == type;
     return Expanded(
       child: InkWell(
-        onTap: () => setState(() => _selectedType = type),
+        onTap: () => setState(() {
+          _selectedType = type;
+          _labelController.text = label;
+        }),
         borderRadius: BorderRadius.circular(12),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10),
@@ -957,6 +1012,18 @@ class _AddressEditorDialogState extends State<_AddressEditorDialog> {
               ),
               const SizedBox(height: 16),
 
+              // ── Address Label ──────────────────────────────
+              TextField(
+                controller: _labelController,
+                textCapitalization: TextCapitalization.words,
+                decoration: _fieldDecoration(
+                  'Address Label / Tag *',
+                  Icons.label_outline,
+                  hint: 'e.g. Home, Work, Clinic',
+                ),
+              ),
+              const SizedBox(height: 12),
+
               // ── Address Line 1 ──────────────────────────────
               TextField(
                 controller: _addressLine1,
@@ -1102,7 +1169,7 @@ class _AddressEditorDialogState extends State<_AddressEditorDialog> {
                     elevation: 0,
                   ),
                   child: const Text(
-                    'Save Address',
+                    'Save address',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                   ),
                 ),

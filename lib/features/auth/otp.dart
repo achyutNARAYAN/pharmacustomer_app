@@ -86,8 +86,11 @@ class _OtpState extends State<Otp> {
       final isRegisteredFlag = res['isRegistered'] as bool?;
       final token = res['token'] as String? ?? '';
       final cust = res['customer'] as Map<String, dynamic>?;
-      final rawMongoId = cust?['_id'] as String? ?? cust?['id'] as String? ?? cust?['customerId'] as String? ?? 'u_customer';
-      final customerId = rawMongoId;
+      final rawCustId = cust?['customerId'] as String? ?? cust?['_id'] as String? ?? cust?['id'] as String? ?? 'u_customer';
+      final customerId = rawCustId;
+      if (cust != null) {
+        ApiService.setCachedCustomerProfile(cust);
+      }
       if (customerId.isNotEmpty && customerId != 'u_customer') {
         ApiService.setCustomerId(customerId);
       }
@@ -119,10 +122,14 @@ class _OtpState extends State<Otp> {
           profile.setPhone(cust['mobileNumber'] as String? ?? phone);
           if (cust['email'] != null) profile.setEmail(cust['email'] as String);
           if (cust['addresses'] is List && (cust['addresses'] as List).isNotEmpty) {
-            final firstAddr = (cust['addresses'] as List).first as Map<String, dynamic>?;
-            if (firstAddr != null) {
-              final line1 = firstAddr['addressLine1'] ?? '';
-              final city = firstAddr['city'] ?? '';
+            final addrs = cust['addresses'] as List;
+            final defAddr = addrs.firstWhere(
+              (a) => a is Map && a['isDefault'] == true,
+              orElse: () => addrs.first,
+            ) as Map<String, dynamic>?;
+            if (defAddr != null) {
+              final line1 = defAddr['addressLine1'] ?? '';
+              final city = defAddr['city'] ?? '';
               final fullAddr = [line1, city].where((s) => s.toString().isNotEmpty).join(', ');
               if (fullAddr.isNotEmpty) profile.setAddress(fullAddr);
             }

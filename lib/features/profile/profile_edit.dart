@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'customer_address_screen.dart';
 
 import '../../core/theme.dart';
 
@@ -155,7 +156,26 @@ class _ProfileEditState extends State<ProfileEdit> {
                 const SizedBox(height: 14),
                 Text('Delivery addresses', style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 4),
-                Text('Saved addresses available at checkout.', style: Theme.of(context).textTheme.bodyMedium),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text('Saved addresses available at checkout.', style: Theme.of(context).textTheme.bodyMedium),
+                    ),
+                    TextButton.icon(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) => CustomerAddressManagementScreen(
+                            userName: _name.text,
+                            userPhone: _phone.text,
+                          ),
+                        ),
+                      ),
+                      icon: const Icon(Icons.tune_rounded, size: 16),
+                      label: const Text('Manage'),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 14),
                 _field(_address, 'Home', Icons.home_outlined, minLines: 2, maxLines: 3),
                 const SizedBox(height: 14),

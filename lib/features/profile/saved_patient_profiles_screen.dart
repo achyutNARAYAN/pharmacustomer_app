@@ -77,57 +77,64 @@ class _ProfilesView extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 20),
-              if (profiles.length <= 1) ...[
-                const SizedBox(height: 48),
-                const Icon(
-                  Icons.people_outline,
-                  size: 64,
-                  color: AppTheme.primary,
-                ),
-                const SizedBox(height: 12),
-                const Center(child: Text('No family members added yet')),
-                const SizedBox(height: 14),
-                OutlinedButton.icon(
-                  onPressed: () => _edit(context),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Add family member'),
-                ),
-              ] else
-                ...profiles.asMap().entries.map((entry) {
-                  final profile = entry.value;
-                  return TweenAnimationBuilder<double>(
-                    key: ValueKey(profile.id),
-                    tween: Tween(begin: 0, end: 1),
-                    duration: Duration(milliseconds: 180 + entry.key * 45),
-                    builder: (context, value, child) => Opacity(
-                      opacity: value,
-                      child: Transform.translate(
-                        offset: Offset(0, 8 * (1 - value)),
-                        child: child,
-                      ),
+              ...profiles.asMap().entries.map((entry) {
+                final profile = entry.value;
+                return TweenAnimationBuilder<double>(
+                  key: ValueKey(profile.id),
+                  tween: Tween(begin: 0, end: 1),
+                  duration: Duration(milliseconds: 180 + entry.key * 45),
+                  builder: (context, value, child) => Opacity(
+                    opacity: value,
+                    child: Transform.translate(
+                      offset: Offset(0, 8 * (1 - value)),
+                      child: child,
                     ),
-                    child: PatientProfileCard(
-                      profile: profile,
-                      photoPath: profile.isSelf ? profileImagePath : null,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute<void>(
-                          builder: (_) => PrescriptionVault(
-                            patientName: profile.name,
-                            patientId: profile.id,
-                            allergies: profile.allergies,
-                            profileImagePath: profile.isSelf
-                                ? profileImagePath
-                                : null,
-                          ),
+                  ),
+                  child: PatientProfileCard(
+                    profile: profile,
+                    photoPath: profile.isSelf ? profileImagePath : null,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute<void>(
+                        builder: (_) => PrescriptionVault(
+                          patientName: profile.name,
+                          patientId: profile.id,
+                          allergies: profile.allergies,
+                          profileImagePath: profile.isSelf
+                              ? profileImagePath
+                              : null,
                         ),
                       ),
-                      onEdit: () => _edit(context, profile),
-                      onDefault: () => state.setDefault(profile),
-                      onDelete: () => _delete(context, profile),
                     ),
-                  );
-                }),
+                    onEdit: () => _edit(context, profile),
+                    onDefault: () => state.setDefault(profile),
+                    onDelete: () => _delete(context, profile),
+                  ),
+                );
+              }),
+              if (profiles.length <= 1) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceLow,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppTheme.outlineBorder),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.info_outline, color: AppTheme.primary, size: 24),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Add family members to manage and upload their prescriptions separately.',
+                          style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         );
@@ -214,18 +221,10 @@ class _ProfilesView extends StatelessWidget {
 class _LoadingProfiles extends StatelessWidget {
   const _LoadingProfiles();
   @override
-  Widget build(BuildContext context) => ListView(
-    padding: const EdgeInsets.all(16),
-    children: List.generate(
-      3,
-      (_) => const Card(
-        child: SizedBox(
-          height: 132,
-          child: Center(
-            child: LinearProgressIndicator(color: AppTheme.primary),
-          ),
-        ),
-      ),
+  Widget build(BuildContext context) => const Center(
+    child: Padding(
+      padding: EdgeInsets.all(48),
+      child: CircularProgressIndicator(color: AppTheme.primary),
     ),
   );
 }
