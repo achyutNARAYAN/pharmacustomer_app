@@ -5,17 +5,57 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
 import '../../core/constants/app_strings.dart';
+import '../../core/models/medicine_model.dart';
+import '../../core/services/api_service.dart';
 import 'search.dart';
+import '../medicine/medicine_detail.dart';
 import 'widgets/condition_item.dart';
 import 'widgets/prescription_banner.dart';
 import 'widgets/trending_card.dart';
 
-class Home extends StatelessWidget {
+class Home extends StatefulWidget {
   final String name;
   final String location;
   final String? profileImagePath;
   final ValueChanged<PlatformFile>? onPrescriptionUpload;
-  const Home({super.key, required this.name, this.location = 'Set delivery location', this.profileImagePath, this.onPrescriptionUpload});
+
+  const Home({
+    super.key,
+    required this.name,
+    this.location = 'Set delivery location',
+    this.profileImagePath,
+    this.onPrescriptionUpload,
+  });
+
+  @override
+  State<Home> createState() => _HomeState();
+}
+
+class _HomeState extends State<Home> {
+  List<Medicine> _trendingMedicines = [];
+  bool _isLoadingTrending = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchTrending();
+  }
+
+  Future<void> _fetchTrending() async {
+    setState(() => _isLoadingTrending = true);
+    try {
+      final items = await ApiService.searchMedicines(limit: 20);
+      if (mounted) {
+        setState(() {
+          _trendingMedicines = items.map((m) => Medicine.fromJson(m)).toList();
+        });
+      }
+    } catch (_) {
+      // Fallback gracefully if offline
+    } finally {
+      if (mounted) setState(() => _isLoadingTrending = false);
+    }
+  }
 
   // ── Time-of-day greeting ───────────────────────────────────────────────────
   String get _greeting {
@@ -30,27 +70,32 @@ class Home extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: _buildAppBar(),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _welcomeRow(context),
-            const SizedBox(height: 14),
-            _locationChip(context),
-            const SizedBox(height: 16),
-            _searchBar(context),
-            const SizedBox(height: 22),
-            PrescriptionBanner(onUploadSelected: onPrescriptionUpload),
-            const SizedBox(height: 28),
-            _browseByConcernHeader(context),
-            const SizedBox(height: 14),
-            _conditionRow(),
-            const SizedBox(height: 28),
-            _trendingHeader(context),
-            const SizedBox(height: 14),
-            _trendingRow(),
-          ],
+      body: RefreshIndicator(
+        onRefresh: _fetchTrending,
+        color: AppTheme.primary,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _welcomeRow(context),
+              const SizedBox(height: 14),
+              _locationChip(context),
+              const SizedBox(height: 16),
+              _searchBar(context),
+              const SizedBox(height: 22),
+              PrescriptionBanner(onUploadSelected: widget.onPrescriptionUpload),
+              const SizedBox(height: 28),
+              _browseByConcernHeader(context),
+              const SizedBox(height: 14),
+              _conditionRow(),
+              const SizedBox(height: 28),
+              _trendingHeader(context),
+              const SizedBox(height: 14),
+              _trendingRow(),
+            ],
+          ),
         ),
       ),
     );
@@ -115,7 +160,7 @@ class Home extends StatelessWidget {
             const SizedBox(height: 4),
             ConstrainedBox(
               constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width - 100),
-              child: Text('$_greeting, $name',
+              child: Text('$_greeting, ${widget.name}',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize: 20, height: 1.15)),
@@ -131,8 +176,8 @@ class Home extends StatelessWidget {
           child: CircleAvatar(
             radius: 23,
             backgroundColor: AppTheme.primaryContainer,
-            backgroundImage: profileImagePath == null ? null : FileImage(File(profileImagePath!)),
-            child: profileImagePath == null ? const Icon(Icons.person, color: AppTheme.primary) : null,
+            backgroundImage: widget.profileImagePath == null ? null : FileImage(File(widget.profileImagePath!)),
+            child: widget.profileImagePath == null ? const Icon(Icons.person, color: AppTheme.primary) : null,
           ),
         ),
       ],
@@ -153,7 +198,7 @@ class Home extends StatelessWidget {
             children: [
               const Icon(Icons.location_on_outlined, size: 18, color: AppTheme.primary),
               const SizedBox(width: 6),
-              Flexible(child: Text(location, style: Theme.of(context).textTheme.bodyMedium, overflow: TextOverflow.ellipsis)),
+              Flexible(child: Text(widget.location, style: Theme.of(context).textTheme.bodyMedium, overflow: TextOverflow.ellipsis)),
             ],
           ),
         ),
@@ -211,11 +256,41 @@ class Home extends StatelessWidget {
   Widget _conditionRow() {
     return Row(
       children: const [
-        Expanded(child: ConditionItem(icon: Icons.favorite_outline, label: 'Cardio', iconColor: Colors.red, categoryName: 'Heart & BP')),
-        Expanded(child: ConditionItem(icon: Icons.water_drop_outlined, label: 'Diabetes', iconColor: Colors.teal, categoryName: 'Diabetes Care & Management')),
-        Expanded(child: ConditionItem(icon: Icons.psychology_outlined, label: 'Neuro', iconColor: Colors.cyan, categoryName: 'Neuro & Mental Health')),
-        Expanded(child: ConditionItem(icon: Icons.spa_outlined, label: 'Wellness', iconColor: Colors.green, categoryName: 'Vitamins & Daily')),
-        Expanded(child: ConditionItem(icon: Icons.air, label: 'Respiratory', iconColor: Colors.teal, categoryName: 'Respiratory & Cold')),
+        Expanded(
+          child: ConditionItem(
+            icon: Icons.healing,
+            label: 'Fever & Pain',
+            iconColor: Colors.red,
+            categoryName: 'Fever & Pain',
+          ),
+        ),
+        SizedBox(width: 8),
+        Expanded(
+          child: ConditionItem(
+            icon: Icons.medication_liquid,
+            label: 'Antibiotics',
+            iconColor: Colors.teal,
+            categoryName: 'Antibiotics',
+          ),
+        ),
+        SizedBox(width: 8),
+        Expanded(
+          child: ConditionItem(
+            icon: Icons.medication,
+            label: 'Gastro',
+            iconColor: Colors.cyan,
+            categoryName: 'Gastro & Acid Reflux',
+          ),
+        ),
+        SizedBox(width: 8),
+        Expanded(
+          child: ConditionItem(
+            icon: Icons.category_outlined,
+            label: 'All Meds',
+            iconColor: AppTheme.primary,
+            categoryName: 'All',
+          ),
+        ),
       ],
     );
   }
@@ -224,30 +299,74 @@ class Home extends StatelessWidget {
       Text('Trending essentials', style: Theme.of(context).textTheme.headlineSmall);
 
   Widget _trendingRow() {
-    return Row(
-      children: [
-        Expanded(
-          child: TrendingCard(
-            title: 'Vitamin D3',
-            subtitle: '4 Capsules • Weekly',
-            price: '₹120',
-            tag: 'OTC',
-            tagColor: Colors.teal.shade50,
-            tagTextColor: Colors.teal.shade800,
+    if (_isLoadingTrending && _trendingMedicines.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 24),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_trendingMedicines.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.outlineBorder),
+        ),
+        child: Center(
+          child: Column(
+            children: [
+              const Icon(Icons.inventory_2_outlined, color: Colors.grey, size: 36),
+              const SizedBox(height: 8),
+              const Text(
+                'No medicines found in central catalogue.',
+                style: TextStyle(color: Colors.grey, fontSize: 13),
+              ),
+              const SizedBox(height: 4),
+              TextButton(
+                onPressed: _fetchTrending,
+                child: const Text('Pull down or tap to refresh'),
+              ),
+            ],
           ),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: TrendingCard(
-            title: 'Omega-3 Fish Oil',
-            subtitle: '60 Softgels • 1000mg',
-            price: '₹649',
-            tag: 'OTC',
-            tagColor: Colors.teal.shade50,
-            tagTextColor: Colors.teal.shade800,
-          ),
-        ),
-      ],
+      );
+    }
+
+    return SizedBox(
+      height: 240,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: _trendingMedicines.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        itemBuilder: (context, index) {
+          final med = _trendingMedicines[index];
+          return SizedBox(
+            width: 180,
+            child: GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => MedicineDetail(medicine: med),
+                ),
+              ),
+              child: TrendingCard(
+                id: med.id,
+                title: med.name,
+                subtitle: med.tag ?? med.description,
+                price: '₹${med.price}',
+                tag: med.requiresPrescription ? 'Rx' : 'OTC',
+                tagColor: med.requiresPrescription ? Colors.amber.shade50 : Colors.teal.shade50,
+                tagTextColor: med.requiresPrescription ? Colors.amber.shade900 : Colors.teal.shade800,
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }

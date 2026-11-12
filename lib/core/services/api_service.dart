@@ -763,9 +763,9 @@ class ApiService {
     return res is Map<String, dynamic> ? res : null;
   }
 
-  // ── 5. Cart & Pre-Checkout ────────────────────────────────────────────────
+  // ── 5. Cart & Pre-Checkout (Module 5 - 11 Endpoints) ─────────────────────
 
-  /// Get active customer cart
+  /// 1. Get active customer cart with live catalog reconciliation & summary
   static Future<Map<String, dynamic>?> getCart() async {
     try {
       final res = await get(ApiConstants.cart);
@@ -775,23 +775,76 @@ class ApiService {
     }
   }
 
-  /// Add item to cart triggering 4km dark store allocation
-  static Future<dynamic> addCartItem(String medicineId, int quantity) async {
+  /// 2. Add item to active cart (medicineId: 24-char ObjectId, quantity: 1..50)
+  static Future<dynamic> addCartItem(String medicineId, [int quantity = 1]) async {
     return await post(ApiConstants.cartItems, body: {
       'medicineId': medicineId,
-      'quantity': quantity,
+      'quantity': quantity.clamp(1, 50),
     });
   }
 
-  /// Pre-checkout validation & prescription quota freeze
+  /// 3. Update quantity of existing cart line item (itemId: line item _id, quantity: 1..50)
+  static Future<dynamic> updateCartItemQuantity(String itemId, int quantity) async {
+    return await patch(ApiConstants.cartItem(itemId), body: {
+      'quantity': quantity.clamp(1, 50),
+    });
+  }
+
+  /// 4. Remove a line item from active cart by line item _id
+  static Future<dynamic> removeCartItem(String itemId) async {
+    return await delete(ApiConstants.cartItem(itemId));
+  }
+
+  /// 5. Clear entire cart (resets items, store allocation, coupons, and prescription)
+  static Future<dynamic> clearCart() async {
+    return await delete(ApiConstants.cart);
+  }
+
+  /// 6. Preview 4km blind store allocation with FEFO stock check
+  static Future<Map<String, dynamic>?> allocateStore(String addressId) async {
+    final res = await post(ApiConstants.cartAllocate, body: {
+      'addressId': addressId,
+    });
+    return res is Map<String, dynamic> ? res : null;
+  }
+
+  /// 7. Attach verified (APPROVED) prescription to active cart
+  static Future<dynamic> attachCartPrescription(String prescriptionId) async {
+    return await post(ApiConstants.cartPrescription, body: {
+      'prescriptionId': prescriptionId,
+    });
+  }
+
+  /// 8. Remove attached prescription from active cart
+  static Future<dynamic> removeCartPrescription() async {
+    return await delete(ApiConstants.cartPrescription);
+  }
+
+  /// 9. Apply promotional coupon code (e.g. WELCOME50, SAVE10)
+  static Future<dynamic> applyCoupon(String couponCode) async {
+    return await post(ApiConstants.cartCoupon, body: {
+      'couponCode': couponCode.trim().toUpperCase(),
+    });
+  }
+
+  /// 10. Remove applied coupon code
+  static Future<dynamic> removeCoupon() async {
+    return await delete(ApiConstants.cartCoupon);
+  }
+
+  /// 11. Atomic checkout orchestration & 15-minute stock lock (transitions to LOCKED)
   static Future<dynamic> checkout({
     required String addressId,
     String? prescriptionId,
     String? couponCode,
   }) async {
     final body = <String, dynamic>{'addressId': addressId};
-    if (prescriptionId != null) body['prescriptionId'] = prescriptionId;
-    if (couponCode != null) body['couponCode'] = couponCode;
+    if (prescriptionId != null && prescriptionId.isNotEmpty) {
+      body['prescriptionId'] = prescriptionId;
+    }
+    if (couponCode != null && couponCode.isNotEmpty) {
+      body['couponCode'] = couponCode.trim().toUpperCase();
+    }
     return await post(ApiConstants.cartCheckout, body: body);
   }
 }

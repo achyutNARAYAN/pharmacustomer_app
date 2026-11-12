@@ -120,9 +120,15 @@ class _MedicineDetailExtendedState extends State<MedicineDetailExtended> {
             child: ElevatedButton(
               onPressed: () {
                 final cart = context.read<CartNotifier>();
-                for (var i = 0; i < _quantity; i++) {
-                  cart.add(CartItem(id: cartId, name: _medicine.name, pack: _medicine.tag ?? '', price: price));
-                }
+                final item = CartItem(
+                  id: cartId,
+                  name: _medicine.name,
+                  pack: _medicine.tag ?? '',
+                  price: price,
+                  quantity: _quantity,
+                  requiresPrescription: _medicine.requiresPrescription,
+                );
+                cart.addMedicine(cartId, quantity: _quantity, localFallback: item);
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text('$_quantity × ${_medicine.name} added to cart'),

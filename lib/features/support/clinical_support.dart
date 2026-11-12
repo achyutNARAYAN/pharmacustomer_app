@@ -166,6 +166,10 @@ class _ClinicalSupportState extends State<ClinicalSupport> {
   Widget _quick(String label, String message) => Padding(
     padding: const EdgeInsets.only(right: 8),
     child: OutlinedButton(
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(0, 32),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+      ),
       onPressed: () => _send(message),
       child: Text(label, style: const TextStyle(fontSize: 11)),
     ),

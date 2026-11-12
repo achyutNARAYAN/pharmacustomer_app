@@ -18,12 +18,13 @@ class Payment extends StatefulWidget {
 class _PaymentState extends State<Payment> {
   String method = 'UPI';
   String? upiApp;
-  bool applied = false;
 
   @override
   Widget build(BuildContext context) {
-    final total = context.watch<CartNotifier>().totalPrice;
-    final payable = (total - (applied ? 50 : 0)).clamp(0, total).toDouble();
+    final cart = context.watch<CartNotifier>();
+    final payable = cart.totalPrice;
+    final hasCoupon = cart.couponCode != null;
+
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
@@ -37,6 +38,49 @@ class _PaymentState extends State<Payment> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
         children: [
+          if (cart.isLocked) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(bottom: 14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF8E1),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.amber.shade400),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.timer_outlined, color: Colors.amber, size: 22),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '15-Minute Inventory Hold Active',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                        Text(
+                          'Items reserved for ${cart.remainingHoldFormatted} to prevent stockout.',
+                          style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      cart.remainingHoldFormatted,
+                      style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           _panel(
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -44,10 +88,17 @@ class _PaymentState extends State<Payment> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
                   decoration: BoxDecoration(color: AppTheme.surfaceLow, borderRadius: BorderRadius.circular(14)),
-                  child: const Row(children: [
-                    Icon(Icons.verified_outlined, color: AppTheme.primary, size: 19),
-                    SizedBox(width: 8),
-                    Expanded(child: Text('subsidy applied · You save ₹161', style: TextStyle(color: AppTheme.primaryDark, fontWeight: FontWeight.w700))),
+                  child: Row(children: [
+                    const Icon(Icons.verified_outlined, color: AppTheme.primary, size: 19),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        hasCoupon
+                            ? 'Coupon \'${cart.couponCode}\' applied · Saved ₹${(cart.discountPaise / 100).toStringAsFixed(0)}'
+                            : 'subsidy applied · You save ₹161',
+                        style: const TextStyle(color: AppTheme.primaryDark, fontWeight: FontWeight.w700),
+                      ),
+                    ),
                   ]),
                 ),
                 const Divider(height: 28),
@@ -59,7 +110,7 @@ class _PaymentState extends State<Payment> {
                   children: [
                     Expanded(
                       child: Text(
-                        '₹${payable.toStringAsFixed(0)}',
+                        cart.remoteCart?.formattedTotalPayable ?? '₹${payable.toStringAsFixed(0)}',
                         style: const TextStyle(
                           fontSize: 34,
                           fontWeight: FontWeight.bold,
@@ -70,7 +121,7 @@ class _PaymentState extends State<Payment> {
                     TextButton(
                       onPressed: _showCoupon,
                       child: Text(
-                        applied ? 'Coupon applied ✓' : 'Coupons & Offers',
+                        hasCoupon ? 'Coupon applied ✓' : 'Coupons & Offers',
                       ),
                     ),
                   ],
@@ -217,6 +268,7 @@ class _PaymentState extends State<Payment> {
   );
 
   void _showCoupon() {
+    final cart = context.read<CartNotifier>();
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -224,8 +276,8 @@ class _PaymentState extends State<Payment> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (_) => CouponOffers(
-        applied: applied,
-        onApply: (code) => setState(() => applied = code.isNotEmpty),
+        applied: cart.couponCode != null,
+        onApply: (code) {},
       ),
     );
   }

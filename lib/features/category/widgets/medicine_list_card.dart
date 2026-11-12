@@ -6,6 +6,7 @@ import '../../../core/providers/cart_notifier.dart';
 import '../../../core/theme.dart';
 
 class MedicineListCard extends StatelessWidget {
+  final String? id;
   final String name;
   final String description;
   final String price;
@@ -19,6 +20,7 @@ class MedicineListCard extends StatelessWidget {
 
   const MedicineListCard({
     super.key,
+    this.id,
     required this.name,
     required this.description,
     required this.price,
@@ -37,7 +39,7 @@ class MedicineListCard extends StatelessWidget {
     return double.tryParse(cleaned) ?? 0;
   }
 
-  String get _cartId => name.toLowerCase().replaceAll(' ', '_');
+  String get _cartId => id ?? name.toLowerCase().replaceAll(' ', '_');
 
   @override
   Widget build(BuildContext context) {
@@ -74,7 +76,13 @@ class MedicineListCard extends StatelessWidget {
                       children: [
                         Expanded(child: _PriceRow(price: price, mrp: mrp, discount: discount)),
                         const SizedBox(width: 10),
-                        _CartControl(cartId: _cartId, name: name, pack: tag ?? '', price: _parsedPrice),
+                        _CartControl(
+                          cartId: _cartId,
+                          name: name,
+                          pack: tag ?? '',
+                          price: _parsedPrice,
+                          requiresPrescription: requiresPrescription,
+                        ),
                       ],
                     ),
                     if (deliveryNote != null) ...[
@@ -100,8 +108,15 @@ class _CartControl extends StatelessWidget {
   final String name;
   final String pack;
   final double price;
+  final bool requiresPrescription;
 
-  const _CartControl({required this.cartId, required this.name, required this.pack, required this.price});
+  const _CartControl({
+    required this.cartId,
+    required this.name,
+    required this.pack,
+    required this.price,
+    this.requiresPrescription = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -111,7 +126,13 @@ class _CartControl extends StatelessWidget {
     if (qty == 0) {
       return ElevatedButton(
         onPressed: () => context.read<CartNotifier>().add(
-              CartItem(id: cartId, name: name, pack: pack, price: price),
+              CartItem(
+                id: cartId,
+                name: name,
+                pack: pack,
+                price: price,
+                requiresPrescription: requiresPrescription,
+              ),
             ),
         style: ElevatedButton.styleFrom(
           backgroundColor: AppTheme.primary,

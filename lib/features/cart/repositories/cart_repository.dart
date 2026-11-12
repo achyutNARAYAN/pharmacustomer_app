@@ -9,6 +9,7 @@ import '../models/cart_merge_policy.dart';
 import '../models/cart_snapshot.dart';
 
 import '../../../core/services/api_service.dart';
+import '../models/cart_models.dart';
 
 class CartRepository implements UserScopedStore {
   static const int currentVersion = 1;
@@ -30,13 +31,180 @@ class CartRepository implements UserScopedStore {
     userDataRegistry.registerStore(this);
   }
 
-  /// Syncs remote cart from ApiService if online
-  Future<CartSnapshot?> fetchRemoteCart() async {
+  // ── Remote API Integration (Module 5: 11 Endpoints) ───────────────────────
+
+  /// 1. Syncs active remote cart with live catalogue pricing and summary flags
+  Future<GetCartResponse?> fetchRemoteCartEnvelope() async {
     try {
       final res = await ApiService.getCart();
-      if (res != null) return CartSnapshot.fromJson(res);
+      if (res != null) {
+        return GetCartResponse.fromJson(res);
+      }
+    } catch (e) {
+      logger?.warning('Failed to fetch remote cart envelope: $e');
+    }
+    return null;
+  }
+
+  /// Backward compatible helper returning CartSnapshot for local hydration
+  Future<CartSnapshot?> fetchRemoteCart() async {
+    try {
+      final envelope = await fetchRemoteCartEnvelope();
+      if (envelope != null) {
+        final lines = envelope.cart.items.map((i) => i.toCartItem()).toList();
+        final rxList = envelope.cart.prescriptionId != null ? [envelope.cart.prescriptionId!] : <String>[];
+        return CartSnapshot(
+          lines: lines,
+          prescriptionIds: rxList,
+          lastSyncedAt: envelope.cart.updatedAt ?? DateTime.now(),
+        );
+      }
     } catch (e) {
       logger?.warning('Failed to fetch remote cart: $e');
+    }
+    return null;
+  }
+
+  /// 2. Add medicine to active cart via API
+  Future<CartModel?> addRemoteItem(String medicineId, [int quantity = 1]) async {
+    try {
+      final res = await ApiService.addCartItem(medicineId, quantity);
+      if (res is Map<String, dynamic>) {
+        return CartModel.fromJson(res);
+      }
+    } catch (e) {
+      logger?.error('CartRepository.addRemoteItem failed: $e');
+      rethrow;
+    }
+    return null;
+  }
+
+  /// 3. Update quantity of existing cart line item by its line item _id
+  Future<CartModel?> updateRemoteQuantity(String lineItemId, int quantity) async {
+    try {
+      final res = await ApiService.updateCartItemQuantity(lineItemId, quantity);
+      if (res is Map<String, dynamic>) {
+        return CartModel.fromJson(res);
+      }
+    } catch (e) {
+      logger?.error('CartRepository.updateRemoteQuantity failed: $e');
+      rethrow;
+    }
+    return null;
+  }
+
+  /// 4. Remove a line item from cart by its line item _id
+  Future<CartModel?> removeRemoteItem(String lineItemId) async {
+    try {
+      final res = await ApiService.removeCartItem(lineItemId);
+      if (res is Map<String, dynamic>) {
+        return CartModel.fromJson(res);
+      }
+    } catch (e) {
+      logger?.error('CartRepository.removeRemoteItem failed: $e');
+      rethrow;
+    }
+    return null;
+  }
+
+  /// 5. Clear entire cart
+  Future<CartModel?> clearRemoteCart() async {
+    try {
+      final res = await ApiService.clearCart();
+      if (res is Map<String, dynamic>) {
+        return CartModel.fromJson(res);
+      }
+    } catch (e) {
+      logger?.error('CartRepository.clearRemoteCart failed: $e');
+      rethrow;
+    }
+    return null;
+  }
+
+  /// 6. Preview 4km blind store allocation with FEFO check
+  Future<Map<String, dynamic>?> allocateStoreRemote(String addressId) async {
+    try {
+      return await ApiService.allocateStore(addressId);
+    } catch (e) {
+      logger?.error('CartRepository.allocateStoreRemote failed: $e');
+      rethrow;
+    }
+  }
+
+  /// 7. Attach verified (APPROVED) prescription to cart
+  Future<CartModel?> attachPrescriptionRemote(String prescriptionId) async {
+    try {
+      final res = await ApiService.attachCartPrescription(prescriptionId);
+      if (res is Map<String, dynamic>) {
+        return CartModel.fromJson(res);
+      }
+    } catch (e) {
+      logger?.error('CartRepository.attachPrescriptionRemote failed: $e');
+      rethrow;
+    }
+    return null;
+  }
+
+  /// 8. Remove attached prescription from cart
+  Future<CartModel?> removePrescriptionRemote() async {
+    try {
+      final res = await ApiService.removeCartPrescription();
+      if (res is Map<String, dynamic>) {
+        return CartModel.fromJson(res);
+      }
+    } catch (e) {
+      logger?.error('CartRepository.removePrescriptionRemote failed: $e');
+      rethrow;
+    }
+    return null;
+  }
+
+  /// 9. Apply promotional coupon (e.g. WELCOME50, SAVE10)
+  Future<CartModel?> applyCouponRemote(String couponCode) async {
+    try {
+      final res = await ApiService.applyCoupon(couponCode);
+      if (res is Map<String, dynamic>) {
+        return CartModel.fromJson(res);
+      }
+    } catch (e) {
+      logger?.error('CartRepository.applyCouponRemote failed: $e');
+      rethrow;
+    }
+    return null;
+  }
+
+  /// 10. Remove applied coupon
+  Future<CartModel?> removeCouponRemote() async {
+    try {
+      final res = await ApiService.removeCoupon();
+      if (res is Map<String, dynamic>) {
+        return CartModel.fromJson(res);
+      }
+    } catch (e) {
+      logger?.error('CartRepository.removeCouponRemote failed: $e');
+      rethrow;
+    }
+    return null;
+  }
+
+  /// 11. Atomic checkout orchestration with 15-minute stock hold
+  Future<CartModel?> checkoutRemote({
+    required String addressId,
+    String? prescriptionId,
+    String? couponCode,
+  }) async {
+    try {
+      final res = await ApiService.checkout(
+        addressId: addressId,
+        prescriptionId: prescriptionId,
+        couponCode: couponCode,
+      );
+      if (res is Map<String, dynamic>) {
+        return CartModel.fromJson(res);
+      }
+    } catch (e) {
+      logger?.error('CartRepository.checkoutRemote failed: $e');
+      rethrow;
     }
     return null;
   }

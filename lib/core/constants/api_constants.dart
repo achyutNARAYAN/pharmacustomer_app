@@ -27,6 +27,10 @@ abstract final class ApiConstants {
   // ── Cart & 4km Store Allocation (Module 5) ────────────────────────────────────
   static const String cart = '/cart';
   static const String cartItems = '/cart/items';
+  static String cartItem(String itemId) => '/cart/items/$itemId';
+  static const String cartAllocate = '/cart/allocate';
+  static const String cartPrescription = '/cart/prescription';
+  static const String cartCoupon = '/cart/coupon';
   static const String cartCheckout = '/cart/checkout';
 
   // ── Orders & Payments ────────────────────────────────────────────────────────

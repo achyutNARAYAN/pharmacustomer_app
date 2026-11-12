@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/errors/failures.dart';
 import '../../core/providers/cart_notifier.dart';
 import '../../core/providers/profile_notifier.dart';
 import '../../core/services/api_service.dart';
@@ -51,6 +52,49 @@ class OrderReview extends StatelessWidget {
         ]),
       ),
       body: ListView(padding: const EdgeInsets.fromLTRB(18, 12, 18, 24), children: [
+        if (cart.isLocked) ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.only(bottom: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF8E1),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.amber.shade400),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.timer_outlined, color: Colors.amber, size: 22),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        '15-Minute Inventory Hold Active',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      Text(
+                        'Items reserved for ${cart.remainingHoldFormatted} to prevent stockout.',
+                        style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    cart.remainingHoldFormatted,
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         _card(Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           _iconBox(Icons.local_shipping_outlined),
           const SizedBox(width: 14),
@@ -82,6 +126,21 @@ class OrderReview extends StatelessWidget {
             Text('$addressTypeLabel · $customerName', style: const TextStyle(color: AppTheme.mutedText)),
             const SizedBox(height: 3),
             Text(deliveryAddress, style: const TextStyle(color: AppTheme.mutedText, height: 1.35)),
+            if (cart.allocatedStore != null) ...[
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  const Icon(Icons.storefront_outlined, size: 15, color: AppTheme.primary),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      'Pharmacy: ${cart.allocatedStore} • 4km FEFO Verified',
+                      style: const TextStyle(fontSize: 11, color: AppTheme.primaryDark, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ])),
           const SizedBox(width: 8),
           const Text('22 min', style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold)),
@@ -208,17 +267,30 @@ class OrderReview extends StatelessWidget {
                 return;
               }
 
+              final addrId = activeAddress?.id.isNotEmpty == true
+                  ? activeAddress!.id
+                  : 'addr_default';
+
               try {
                 if (ApiService.token != null) {
-                  final addrId = activeAddress?.id.isNotEmpty == true
-                      ? activeAddress!.id
-                      : 'addr_default';
-                  await ApiService.checkout(
+                  await cart.performCheckout(
                     addressId: addrId,
-                    prescriptionId: cart.hasPrescriptionAttached ? 'RX-CURRENT' : null,
+                    prescriptionId: cart.prescriptionId,
+                    couponCode: cart.couponCode,
                   );
                 }
-              } catch (_) {}
+              } catch (e) {
+                if (!context.mounted) return;
+                final msg = e is Failure ? e.message : e.toString();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(msg),
+                    backgroundColor: Colors.red.shade800,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+                return;
+              }
               if (!context.mounted) return;
               Navigator.push(
                 context,

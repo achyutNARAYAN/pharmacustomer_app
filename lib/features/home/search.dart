@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -22,6 +23,8 @@ class Search extends StatefulWidget {
 
 class _SearchState extends State<Search> {
   final TextEditingController _searchController = TextEditingController();
+  Timer? _debounceTimer;
+  int _searchRequestId = 0;
   bool _filterColdChain = false;
   List<Medicine> _liveMedicines = [];
   bool _isSearching = false;
@@ -32,11 +35,20 @@ class _SearchState extends State<Search> {
     _fetchLiveMedicines('');
   }
 
+  void _onSearchChanged(String val) {
+    setState(() {});
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 350), () {
+      _fetchLiveMedicines(val.trim());
+    });
+  }
+
   Future<void> _fetchLiveMedicines(String query) async {
+    final currentRequestId = ++_searchRequestId;
     setState(() => _isSearching = true);
     try {
       final items = await ApiService.searchMedicines(search: query.isNotEmpty ? query : null);
-      if (items.isNotEmpty && mounted) {
+      if (mounted && currentRequestId == _searchRequestId) {
         setState(() {
           _liveMedicines = items.map((m) => Medicine.fromJson(m)).toList();
         });
@@ -44,12 +56,15 @@ class _SearchState extends State<Search> {
     } catch (_) {
       // Fallback gracefully to default items if offline
     } finally {
-      if (mounted) setState(() => _isSearching = false);
+      if (mounted && currentRequestId == _searchRequestId) {
+        setState(() => _isSearching = false);
+      }
     }
   }
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -77,8 +92,9 @@ class _SearchState extends State<Search> {
           ),
           child: TextField(
             controller: _searchController,
-            onChanged: (val) {
-              setState(() {});
+            onChanged: _onSearchChanged,
+            onSubmitted: (val) {
+              _debounceTimer?.cancel();
               _fetchLiveMedicines(val.trim());
             },
             decoration: InputDecoration(
@@ -98,8 +114,11 @@ class _SearchState extends State<Search> {
                         size: 18,
                         color: Colors.grey,
                       ),
-                      onPressed: () =>
-                          setState(() => _searchController.clear()),
+                      onPressed: () {
+                        _debounceTimer?.cancel();
+                        setState(() => _searchController.clear());
+                        _fetchLiveMedicines('');
+                      },
                     ),
                 ],
               ),
@@ -167,7 +186,7 @@ class _SearchState extends State<Search> {
       return _buildNoFilterMatchView();
     }
     if (_liveMedicines.isEmpty) {
-      return _buildNotFoundView();
+      return _buildNotFoundView(query);
     }
     return _buildSearchResultsView(query);
   }
@@ -175,171 +194,176 @@ class _SearchState extends State<Search> {
   // ── Browse categories ─────────────────────────────────────────────────────
 
   Widget _buildBrowseCategoriesView() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.shield_outlined, color: AppTheme.primary, size: 18),
-              SizedBox(width: 8),
-              Text('Browse by Health Concern', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontSize: 19)),
-            ],
-          ),
-          const Padding(
-            padding: EdgeInsets.only(left: 26.0, top: 2),
-            child: Text(
-              'Find certified prescription & OTC medicines',
-              style: TextStyle(color: AppTheme.mutedText, fontSize: 13),
+    return RefreshIndicator(
+      onRefresh: () => _fetchLiveMedicines(''),
+      color: AppTheme.primary,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.shield_outlined, color: AppTheme.primary, size: 18),
+                const SizedBox(width: 8),
+                Text('Browse by Health Concern', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontSize: 19)),
+              ],
             ),
-          ),
-          const SizedBox(height: 20),
-          Material(
-            color: const Color(0xFFE7F6F4),
-            borderRadius: BorderRadius.circular(22),
-            child: InkWell(
-            borderRadius: BorderRadius.circular(22),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const CategoryDetail(
-                  categoryName: 'Diabetes Care & Management',
+            const Padding(
+              padding: EdgeInsets.only(left: 26.0, top: 2),
+              child: Text(
+                'Find certified prescription & OTC medicines',
+                style: TextStyle(color: AppTheme.mutedText, fontSize: 13),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Material(
+              color: const Color(0xFFE7F6F4),
+              borderRadius: BorderRadius.circular(22),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(22),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const CategoryDetail(
+                      categoryName: 'Fever & Pain',
+                    ),
+                  ),
+                ),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.teal.shade100,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.healing,
+                              color: AppTheme.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Fever & Pain Relief',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 19,
+                                    color: AppTheme.text,
+                                  ),
+                                ),
+                                Text(
+                                  'Dolo, Paracetamol, Solo 650 & Analgesics',
+                                  style: TextStyle(
+                                    color: AppTheme.mutedText,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(
+                            Icons.chevron_right,
+                            size: 24,
+                            color: AppTheme.mutedText,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: [
+                                  _chip('Dolo 650 Tablet'),
+                                  const SizedBox(width: 6),
+                                  _chip('Paracetamol 650mg'),
+                                  const SizedBox(width: 6),
+                                  _chip('Solo 650 Tablet'),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
+            const SizedBox(height: 14),
+            GridView.builder(
+              itemCount: 6,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                mainAxisExtent: 174,
               ),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                          padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.teal.shade100,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.water_drop,
-                          color: AppTheme.primary,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Diabetes Care',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 19,
-                                color: AppTheme.text,
-                              ),
-                            ),
-                            Text(
-                              'Insulin, Metformin, strips & monitors',
-                              style: TextStyle(
-                                color: AppTheme.mutedText,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Icon(
-                        Icons.chevron_right,
-                        size: 24,
-                        color: AppTheme.mutedText,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: [
-                              _chip('Metformin 500mg'),
-                              const SizedBox(width: 6),
-                              _chip('Glimepiride'),
-                              const SizedBox(width: 6),
-                              _chip('Vildagliptin'),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+              itemBuilder: (context, index) => [
+                _buildCategoryCard(
+                  'Antibiotics',
+                  'Azithral, Augmentin & more',
+                  'Active Catalogue',
+                  Icons.medication_liquid,
+                  Colors.teal,
+                ),
+                _buildCategoryCard(
+                  'Gastro & Acid Reflux',
+                  'Pan 40, Pantoprazole & antacids',
+                  'Active Catalogue',
+                  Icons.medication,
+                  Colors.cyan,
+                ),
+                _buildCategoryCard(
+                  'Fever & Pain',
+                  'Dolo, Solo, Paracetamol',
+                  'Active Catalogue',
+                  Icons.healing,
+                  Colors.red,
+                ),
+                _buildCategoryCard(
+                  'All',
+                  'View all medicines in catalogue',
+                  'Central Inventory',
+                  Icons.inventory_2_outlined,
+                  AppTheme.primary,
+                ),
+                _buildCategoryCard(
+                  'Heart & BP',
+                  'Statins, monitors & ACE',
+                  'Specialized care',
+                  Icons.favorite,
+                  Colors.purple,
+                ),
+                _buildCategoryCard(
+                  'Respiratory & Cold',
+                  'Inhalers, syrups, anti-allergy',
+                  'Respiratory Care',
+                  Icons.air,
+                  Colors.orange,
+                ),
+              ][index],
             ),
-            ),
-          ),
-          const SizedBox(height: 14),
-          GridView.builder(
-            itemCount: 6,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              mainAxisExtent: 174,
-            ),
-            itemBuilder: (context, index) => [
-              _buildCategoryCard(
-                'Heart & BP',
-                'Statins, monitors & ACE',
-                '120+ Items',
-                Icons.favorite,
-                Colors.red,
-              ),
-              _buildCategoryCard(
-                'Fever & Pain',
-                'Analgesics, sprays, gels',
-                '85+ Items',
-                Icons.healing,
-                Colors.teal,
-              ),
-              _buildCategoryCard(
-                'Stomach & Gut',
-                'Antacids, probiotics & gas',
-                '95+ Items',
-                Icons.medication,
-                Colors.cyan,
-              ),
-              _buildCategoryCard(
-                'Skin & Hair',
-                'Dermatology, lotions, scalp',
-                '110+ Items',
-                Icons.clean_hands,
-                Colors.pink,
-              ),
-              _buildCategoryCard(
-                'Respiratory & Cold',
-                'Inhalers, syrups, anti-allergy',
-                '70+ Items',
-                Icons.air,
-                Colors.teal,
-              ),
-              _buildCategoryCard(
-                'Vitamins & Daily',
-                'Vitamin D3, B12, Zinc, Iron',
-                '160+ Items',
-                Icons.show_chart,
-                Colors.teal,
-              ),
-            ][index],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -419,78 +443,85 @@ class _SearchState extends State<Search> {
   }
 
   Widget _buildSearchResultsView(String query) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Showing ${_liveMedicines.length} medicines for',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        color: AppTheme.text,
+    return RefreshIndicator(
+      onRefresh: () => _fetchLiveMedicines(query),
+      color: AppTheme.primary,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Showing ${_liveMedicines.length} medicines for',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: AppTheme.text,
+                        ),
                       ),
-                    ),
-                    Text(
-                      query,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                        color: AppTheme.text,
+                      Text(
+                        query,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                          color: AppTheme.text,
+                        ),
                       ),
-                    ),
-                    const Text(
-                      'Verified authentic supplies from certified pharmacies',
-                      style: TextStyle(color: Colors.grey, fontSize: 11),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              OutlinedButton.icon(
-                onPressed: () =>
-                    setState(() => _filterColdChain = !_filterColdChain),
-                icon: const Icon(
-                  Icons.filter_list,
-                  size: 16,
-                  color: AppTheme.primary,
-                ),
-                label: const Text(
-                  'Filters',
-                  style: TextStyle(color: AppTheme.primary, fontSize: 12),
-                ),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: Colors.teal.shade200),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+                      const Text(
+                        'Verified authentic supplies from certified pharmacies',
+                        style: TextStyle(color: Colors.grey, fontSize: 11),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          ..._liveMedicines.map((med) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _buildMedicineCard(
-                  medicine: med,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => MedicineDetail(medicine: med),
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: () =>
+                      setState(() => _filterColdChain = !_filterColdChain),
+                  icon: const Icon(
+                    Icons.filter_list,
+                    size: 16,
+                    color: AppTheme.primary,
+                  ),
+                  label: const Text(
+                    'Filters',
+                    style: TextStyle(color: AppTheme.primary, fontSize: 12),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(0, 36),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    side: BorderSide(color: Colors.teal.shade200),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
                     ),
                   ),
                 ),
-              )),
-        ],
+              ],
+            ),
+            const SizedBox(height: 16),
+            ..._liveMedicines.map((med) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _buildMedicineCard(
+                    medicine: med,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => MedicineDetail(medicine: med),
+                      ),
+                    ),
+                  ),
+                )),
+          ],
+        ),
       ),
     );
   }
@@ -666,136 +697,147 @@ class _SearchState extends State<Search> {
 
   // ── Not found ─────────────────────────────────────────────────────────────
 
-  Widget _buildNotFoundView() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          const SizedBox(height: 16),
-          Stack(
-            alignment: Alignment.topRight,
-            children: [
-              Container(
-                width: 70,
-                height: 70,
-                decoration: BoxDecoration(
-                  color: Colors.teal.shade50,
-                  shape: BoxShape.circle,
+  Widget _buildNotFoundView(String query) {
+    return RefreshIndicator(
+      onRefresh: () => _fetchLiveMedicines(query),
+      color: AppTheme.primary,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const SizedBox(height: 16),
+            Stack(
+              alignment: Alignment.topRight,
+              children: [
+                Container(
+                  width: 70,
+                  height: 70,
+                  decoration: BoxDecoration(
+                    color: Colors.teal.shade50,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.manage_search,
+                    size: 36,
+                    color: AppTheme.primary,
+                  ),
                 ),
-                child: const Icon(
-                  Icons.manage_search,
-                  size: 36,
-                  color: AppTheme.primary,
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.priority_high,
+                    color: Colors.white,
+                    size: 12,
+                  ),
                 ),
-              ),
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: const BoxDecoration(
-                  color: Colors.red,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.priority_high,
-                  color: Colors.white,
-                  size: 12,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Medicine Not Found in Local\nInventory',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-              color: AppTheme.text,
+              ],
             ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'We couldn\'t find an exact match for "Pirfenidone 800mg" across our 20 dark-store pharmacy clusters.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.grey, fontSize: 12),
-          ),
-          const SizedBox(height: 24),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.teal.shade50.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.teal.shade100),
+            const SizedBox(height: 16),
+            const Text(
+              'Medicine Not Found in Local\nInventory',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: AppTheme.text,
+              ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            const SizedBox(height: 8),
+            Text(
+              'We couldn\'t find an exact match for "$query" across our dark-store pharmacy clusters.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.grey, fontSize: 12),
+            ),
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.teal.shade50.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.teal.shade100),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Upload Prescription & Pharmacist Will Source It',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: AppTheme.text,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Our platform pharmacist team will locate this exact molecule or an authorized bio-equivalent substitute directly from central state hubs.',
+                    style: TextStyle(color: Colors.black54, fontSize: 11),
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton.icon(
+                    onPressed: () => pickPrescription(context),
+                    icon: const Icon(Icons.camera_alt_outlined, size: 16),
+                    label: const Text('Upload Prescription Now'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primary,
+                      minimumSize: const Size(double.infinity, 40),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  'Upload Prescription & Pharmacist Will Source It',
+                  'Available in Central Catalogue',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
                     color: AppTheme.text,
                   ),
                 ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Our platform pharmacist team will locate this exact molecule or an authorized bio-equivalent substitute directly from central state hubs.',
-                  style: TextStyle(color: Colors.black54, fontSize: 11),
-                ),
-                const SizedBox(height: 12),
-                ElevatedButton.icon(
-                  onPressed: () => pickPrescription(context),
-                  icon: const Icon(Icons.camera_alt_outlined, size: 16),
-                  label: const Text('Upload Prescription Now'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primary,
-                    minimumSize: const Size(double.infinity, 40),
+                GestureDetector(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const CategoryDetail(categoryName: 'All')),
+                  ),
+                  child: const Text(
+                    'View All >',
+                    style: TextStyle(
+                      color: AppTheme.primary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 24),
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Available Therapeutic Alternatives',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  color: AppTheme.text,
-                ),
-              ),
-              Text(
-                'View All (4) >',
-                style: TextStyle(
-                  color: AppTheme.primary,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _buildAlternativeCard(
-            'Pirfenex 200mg',
-            'Cipla Ltd • 10 Capsules (Pirfenidone)',
-            '₹420.00',
-            '₹480',
-            'In Stock',
-          ),
-          const SizedBox(height: 12),
-          _buildAlternativeCard(
-            'Nintedanib 100mg',
-            'Boehringer Ingelheim • 10 Softgels',
-            '₹1,250.00',
-            '',
-            'Same Salt Group',
-            isDetails: true,
-          ),
-        ],
+            const SizedBox(height: 12),
+            _buildAlternativeCard(
+              'Dolo 650 Tablet',
+              'Paracetamol IP 650mg • Micro Labs Ltd',
+              '₹35.00',
+              '₹35.00',
+              'Strip of 15',
+            ),
+            const SizedBox(height: 12),
+            _buildAlternativeCard(
+              'Pan 40 Tablet',
+              'Pantoprazole 40mg • Alkem Laboratories Ltd',
+              '₹155.00',
+              '₹155.00',
+              'Strip of 15',
+              isDetails: true,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -858,7 +900,7 @@ class _SearchState extends State<Search> {
           const Row(
             children: [
               Text(
-                'Popular in Diabetes Care',
+                'Popular in Central Catalogue',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
@@ -869,19 +911,19 @@ class _SearchState extends State<Search> {
           ),
           const SizedBox(height: 12),
           _buildAlternativeCard(
-            'Glycomet 500mg SR',
-            'Metformin Hydrochloride • Tablet',
-            '₹20.50',
-            '₹24.00',
-            'STRIP 10',
+            'Dolo 650 Tablet',
+            'Paracetamol IP 650mg • Micro Labs Ltd',
+            '₹35.00',
+            '₹35.00',
+            'Strip of 15',
           ),
           const SizedBox(height: 12),
           _buildAlternativeCard(
-            'Lantus Solostar 100IU/ml',
-            'Insulin Glargine • Sanofi',
-            '₹648.50',
-            '₹720.00',
-            '3ML PEN',
+            'Augmentin 625 Duo Tablet',
+            'Amoxicillin 500mg + Clavulanic Acid 125mg',
+            '₹204.00',
+            '₹204.00',
+            'Strip of 10',
           ),
         ],
       ),
@@ -986,6 +1028,7 @@ class _SearchState extends State<Search> {
                 ),
               ),
               style: OutlinedButton.styleFrom(
+                minimumSize: const Size(80, 36),
                 side: const BorderSide(color: AppTheme.primary),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),

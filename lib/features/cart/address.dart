@@ -5,6 +5,7 @@ import 'package:geocoding/geocoding.dart';
 
 import '../../core/services/api_service.dart';
 import '../../core/theme.dart';
+import '../../core/providers/cart_notifier.dart';
 import '../../core/providers/profile_notifier.dart';
 import '../../core/utils/pincode_validator.dart';
 import 'delivery_options.dart';
@@ -59,6 +60,7 @@ class Address extends StatefulWidget {
 class _AddressState extends State<Address> {
   final List<AddressModel> _addresses = [];
   int _selected = 0;
+  bool _allocating = false;
 
   @override
   void initState() {
@@ -447,28 +449,64 @@ class _AddressState extends State<Address> {
             width: double.infinity,
             height: 58,
             child: ElevatedButton(
-              onPressed: () {
-                if (_addresses.isNotEmpty && _selected < _addresses.length) {
-                  final sel = _addresses[_selected];
-                  if (sel.pincode.isNotEmpty && !PincodeValidator.isServiceable(sel.pincode)) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('PIN code ${sel.pincode} is not serviceable for delivery. Please select or add a serviceable address.'),
-                        backgroundColor: Colors.red.shade800,
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                    return;
-                  }
-                }
-                Navigator.push(
-                  context,
-                  MaterialPageRoute<void>(
-                    builder: (_) => const DeliveryOptions(),
-                  ),
-                );
-              },
-              child: const Text('Deliver to this Address  →'),
+              onPressed: _allocating
+                  ? null
+                  : () async {
+                      if (_addresses.isNotEmpty && _selected < _addresses.length) {
+                        final sel = _addresses[_selected];
+                        if (sel.pincode.isNotEmpty && !PincodeValidator.isServiceable(sel.pincode)) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('PIN code ${sel.pincode} is not serviceable for delivery. Please select or add a serviceable address.'),
+                              backgroundColor: Colors.red.shade800,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                          return;
+                        }
+
+                        final cart = context.read<CartNotifier>();
+                        final addrId = sel.id;
+                        if (addrId != null && addrId.isNotEmpty && ApiService.token != null) {
+                          setState(() => _allocating = true);
+                          final ok = await cart.allocateStore(addrId);
+                          if (!context.mounted) return;
+                          setState(() => _allocating = false);
+
+                          if (!ok && cart.actionError != null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(cart.actionError!),
+                                backgroundColor: Colors.red.shade800,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                            return;
+                          }
+                        }
+                      }
+                      if (!context.mounted) return;
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) => const DeliveryOptions(),
+                        ),
+                      );
+                    },
+              child: _allocating
+                  ? const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        ),
+                        SizedBox(width: 12),
+                        Text('Allocating 4km Pharmacy...'),
+                      ],
+                    )
+                  : const Text('Deliver to this Address  →'),
             ),
           ),
         ],

@@ -345,6 +345,71 @@ void main() {
       expect(res, isNotNull);
     });
 
+    test('POST /cart/allocate calls 4km store allocation endpoint', () async {
+      final mockClient = MockClient((request) async {
+        expect(request.url.path, '/api/v1/cart/allocate');
+        final body = jsonDecode(request.body);
+        expect(body['addressId'], 'addr_01');
+
+        return http.Response(
+          jsonEncode({
+            'success': true,
+            'data': {
+              'success': true,
+              'message': 'Store allocated successfully within 4km',
+              'cart': {'allocatedStore': 'store_01'}
+            }
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      ApiService.setHttpClient(mockClient);
+
+      final res = await ApiService.allocateStore('addr_01');
+      expect(res?['success'], true);
+      expect(res?['message'], contains('within 4km'));
+    });
+
+    test('POST /cart/coupon and DELETE /cart/coupon manage promotional coupons', () async {
+      final mockClient = MockClient((request) async {
+        if (request.method == 'POST') {
+          expect(request.url.path, '/api/v1/cart/coupon');
+          final body = jsonDecode(request.body);
+          expect(body['couponCode'], 'WELCOME50');
+          return http.Response(
+            jsonEncode({
+              'success': true,
+              'data': {'couponCode': 'WELCOME50', 'discountPaise': 5000}
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        } else if (request.method == 'DELETE') {
+          expect(request.url.path, '/api/v1/cart/coupon');
+          return http.Response(
+            jsonEncode({
+              'success': true,
+              'data': {'couponCode': null, 'discountPaise': 0}
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        return http.Response('{"success": false}', 404);
+      });
+
+      ApiService.setHttpClient(mockClient);
+
+      final applied = await ApiService.applyCoupon('welcome50');
+      expect(applied?['couponCode'], 'WELCOME50');
+      expect(applied?['discountPaise'], 5000);
+
+      final removed = await ApiService.removeCoupon();
+      expect(removed?['couponCode'], isNull);
+    });
+
     test('PATCH /customers/:customerId updates full name and email', () async {
       final mockClient = MockClient((request) async {
         expect(request.url.path, '/api/v1/customers/cust_123');

@@ -2,11 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
 import '../../core/models/medicine_model.dart';
-import '../../core/widgets/section_header.dart';
+import '../../core/services/api_service.dart';
 import '../medicine/medicine_detail.dart';
-import 'cgm_sub_category.dart';
-import 'widgets/device_grid_card.dart';
-import 'widgets/filter_sort_sheet.dart';
 import 'widgets/medicine_list_card.dart';
 
 class CategoryDetail extends StatefulWidget {
@@ -21,14 +18,16 @@ class CategoryDetail extends StatefulWidget {
 class _CategoryDetailState extends State<CategoryDetail>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
-  int _appliedFilters = 0;
+  List<Medicine> _medicines = [];
+  bool _isLoading = false;
 
-  static const List<String> _tabs = ['All', 'Oral Medications', 'Insulin & Devices'];
+  static const List<String> _tabs = ['All', 'OTC', 'Prescription (Rx)'];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: _tabs.length, vsync: this);
+    _fetchMedicines();
   }
 
   @override
@@ -37,39 +36,63 @@ class _CategoryDetailState extends State<CategoryDetail>
     super.dispose();
   }
 
-  Future<void> _openFilterSheet() async {
-    final count = await showModalBottomSheet<int>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xFFF6FAFB),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => FilterSortSheet(totalItems: 48, categoryName: widget.categoryName),
-    );
-    if (count != null && mounted) setState(() => _appliedFilters = count);
+  Future<void> _fetchMedicines() async {
+    setState(() => _isLoading = true);
+    try {
+      final isAll = widget.categoryName.toLowerCase() == 'all';
+      List<Map<String, dynamic>> items = [];
+      if (!isAll) {
+        items = await ApiService.searchMedicines(
+          category: widget.categoryName,
+          limit: 50,
+        );
+      }
+
+      if (items.isEmpty) {
+        final allItems = await ApiService.searchMedicines(limit: 50);
+        if (isAll) {
+          items = allItems;
+        } else {
+          final queryCat = widget.categoryName.toLowerCase().trim();
+          items = allItems.where((m) {
+            final cat = (m['category'] ?? '').toString().toLowerCase().trim();
+            final subCat = (m['subCategory'] ?? '').toString().toLowerCase().trim();
+            return cat.contains(queryCat) || queryCat.contains(cat) || subCat.contains(queryCat);
+          }).toList();
+          if (items.isEmpty && allItems.isNotEmpty) {
+            items = allItems;
+          }
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _medicines = items.map((m) => Medicine.fromJson(m)).toList();
+        });
+      }
+    } catch (_) {
+      // Offline fallback
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
-  void _openMedicineDetail() {
+  void _openMedicineDetail(Medicine med) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => const MedicineDetail(
-          medicine: Medicine(
-            name: 'Janumet 50mg/500mg Tablet',
-            description: 'Sitagliptin (50mg) + Metformin HCl (500mg)',
-            price: '485.00',
-            mrp: '550.00',
-            discount: '12% OFF',
-            badge: 'Prescription Required',
-            requiresPrescription: true,
-            tag: 'Strip of 15 tablets',
-          ),
-        ),
+        builder: (_) => MedicineDetail(medicine: med),
       ),
     );
   }
 
-  void _openCgmScreen() {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const CgmSubCategory()));
+  List<Medicine> _filterByTab(int tabIndex) {
+    if (tabIndex == 1) {
+      return _medicines.where((m) => !m.requiresPrescription).toList();
+    } else if (tabIndex == 2) {
+      return _medicines.where((m) => m.requiresPrescription).toList();
+    }
+    return _medicines;
   }
 
   @override
@@ -80,15 +103,87 @@ class _CategoryDetailState extends State<CategoryDetail>
       body: TabBarView(
         controller: _tabController,
         children: [
-          _AllTab(onFilterTap: _openFilterSheet, onMedicineTap: _openMedicineDetail, onCgmTap: _openCgmScreen, appliedFilters: _appliedFilters),
-          _OralMedicationsTab(onMedicineTap: _openMedicineDetail),
-          _InsulinDevicesTab(onCgmTap: _openCgmScreen),
+          _buildMedicineList(_filterByTab(0)),
+          _buildMedicineList(_filterByTab(1)),
+          _buildMedicineList(_filterByTab(2)),
         ],
       ),
     );
   }
 
-  // ── AppBar ────────────────────────────────────────────────────────────────
+  Widget _buildMedicineList(List<Medicine> list) {
+    if (_isLoading && _medicines.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (list.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: _fetchMedicines,
+        color: AppTheme.primary,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(32),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(height: 60),
+                Icon(Icons.inventory_2_outlined, size: 56, color: Colors.grey.shade400),
+                const SizedBox(height: 16),
+                Text(
+                  'No medicines found for ${widget.categoryName}',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.text),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Pull down to refresh or browse all medicines.',
+                  style: TextStyle(color: Colors.grey, fontSize: 13),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                OutlinedButton.icon(
+                  onPressed: _fetchMedicines,
+                  icon: const Icon(Icons.refresh, size: 16),
+                  label: const Text('Refresh'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(0, 38),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _fetchMedicines,
+      color: AppTheme.primary,
+      child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        itemCount: list.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        itemBuilder: (context, index) {
+          final med = list[index];
+          return MedicineListCard(
+            id: med.id,
+            name: med.name,
+            description: med.description,
+            price: '₹${med.price}',
+            mrp: '₹${med.mrp}',
+            discount: med.discount,
+            badge: med.badge,
+            requiresPrescription: med.requiresPrescription,
+            tag: med.tag ?? '1 Unit',
+            onTap: () => _openMedicineDetail(med),
+          );
+        },
+      ),
+    );
+  }
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
@@ -102,8 +197,14 @@ class _CategoryDetailState extends State<CategoryDetail>
         overflow: TextOverflow.ellipsis,
       ),
       actions: [
-        IconButton(icon: const Icon(Icons.search, color: AppTheme.text), onPressed: () => Navigator.pop(context)),
-        IconButton(icon: const Icon(Icons.share_outlined, color: AppTheme.text), onPressed: () {}),
+        IconButton(
+          icon: const Icon(Icons.search, color: AppTheme.text),
+          onPressed: () => Navigator.pop(context),
+        ),
+        IconButton(
+          icon: const Icon(Icons.refresh, color: AppTheme.primary),
+          onPressed: _fetchMedicines,
+        ),
       ],
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(56),
@@ -135,231 +236,10 @@ class _TabPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        ),
       );
-}
-
-// ── Tab bodies ─────────────────────────────────────────────────────────────
-
-class _AllTab extends StatelessWidget {
-  final VoidCallback onFilterTap;
-  final VoidCallback onMedicineTap;
-  final VoidCallback onCgmTap;
-  final int appliedFilters;
-
-  const _AllTab({required this.onFilterTap, required this.onMedicineTap, required this.onCgmTap, required this.appliedFilters});
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(18, 22, 18, 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── Top Prescribed ──────────────────────────────────────────────
-          SectionHeader(
-            title: 'Top Prescribed Oral Drugs',
-            subtitle: 'Verified clinical therapeutic formulas',
-            trailingLabel: 'View All',
-          ),
-          const SizedBox(height: 12),
-          MedicineListCard(
-            name: 'Glycomet-GP 2 Forte',
-            description: 'Metformin 1000mg + Glimepiride 2mg',
-            price: '₹148.50',
-            mrp: '₹175.00',
-            discount: '15% OFF',
-            badge: 'Rx required',
-            requiresPrescription: true,
-            tag: 'Strip of 15 tablets',
-            onTap: onMedicineTap,
-          ),
-          const SizedBox(height: 10),
-          MedicineListCard(
-            name: 'Forxiga 10mg',
-            description: 'Dapagliflozin Propanediol (10mg)',
-            price: '₹572.00',
-            mrp: '₹635.00',
-            discount: '10% OFF',
-            badge: 'Rx required',
-            requiresPrescription: true,
-            tag: 'Strip of 10 tablets',
-            onTap: onMedicineTap,
-          ),
-          const SizedBox(height: 24),
-          // ── Devices ─────────────────────────────────────────────────────
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Text('Monitoring devices & strips',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: AppTheme.text)),
-                    SizedBox(height: 3),
-                    Text('Reliable tools for everyday monitoring',
-                        style: TextStyle(color: AppTheme.mutedText, fontSize: 12)),
-                  ],
-                ),
-              ),
-              TextButton.icon(
-                onPressed: onFilterTap,
-                icon: const Icon(Icons.filter_list, size: 14, color: AppTheme.primary),
-                label: Text(appliedFilters == 0 ? 'Filter' : 'Filter ($appliedFilters)', style: const TextStyle(color: AppTheme.primary, fontSize: 12)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final tileWidth = (constraints.maxWidth - 12) / 2;
-              final tileHeight = (tileWidth / 0.58).clamp(296.0, double.infinity);
-              return GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: tileWidth / tileHeight,
-            children: [
-              DeviceGridCard(
-                name: 'Accu-Chek Active Glucometer Kit',
-                description: 'With 10 free test strips + lancing pen',
-                price: '₹1,149',
-                mrp: '₹1,599',
-                discountBadge: '28% OFF',
-                rating: 4.8,
-                reviewCount: '1.2k',
-                onTap: onCgmTap,
-              ),
-              DeviceGridCard(
-                name: 'OneTouch Select Plus Test Strips',
-                description: 'Pack of 50 strips • High accuracy',
-                price: '₹980',
-                mrp: '₹1,150',
-                discountBadge: '15% OFF',
-                rating: 4.9,
-                reviewCount: '3.4k',
-                onTap: onCgmTap,
-              ),
-              DeviceGridCard(
-                name: 'Dr. Morepen Sterile Lancets',
-                description: 'Round sterile needles • 100 count',
-                price: '₹240',
-                mrp: '₹370',
-                discountBadge: '35% OFF',
-                rating: 4.6,
-                reviewCount: '810',
-                onTap: onCgmTap,
-              ),
-              DeviceGridCard(
-                name: 'FreeStyle Libre CGM Sensor',
-                description: '14-day continuous glucose monitoring',
-                price: '₹4,999',
-                mrp: '₹5,550',
-                discountBadge: '10% OFF',
-                rating: 4.9,
-                reviewCount: '2.1k',
-                onTap: onCgmTap,
-              ),
-            ],
-          );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _OralMedicationsTab extends StatelessWidget {
-  final VoidCallback onMedicineTap;
-  const _OralMedicationsTab({required this.onMedicineTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        MedicineListCard(
-          name: 'Glycomet-GP 2 Forte',
-          description: 'Metformin (1000mg) + Glimepiride (2mg)',
-          price: '₹148.50',
-          mrp: '₹175.00',
-          discount: '15% OFF',
-          badge: 'Req Required',
-          requiresPrescription: true,
-          tag: 'Strip of 15 tablets',
-          onTap: onMedicineTap,
-        ),
-        const SizedBox(height: 10),
-        MedicineListCard(
-          name: 'Forxiga 10mg',
-          description: 'Dapagliflozin Propanediol (10mg)',
-          price: '₹572.00',
-          mrp: '₹635.00',
-          discount: '10% OFF',
-          badge: 'Req Required',
-          requiresPrescription: true,
-          tag: 'Strip of 10 tablets',
-          onTap: onMedicineTap,
-        ),
-        const SizedBox(height: 10),
-        MedicineListCard(
-          name: 'Janumet 50mg/500mg Tablet',
-          description: 'Sitagliptin (50mg) + Metformin HCl (500mg)',
-          price: '₹485.00',
-          mrp: '₹550.00',
-          discount: '12% OFF',
-          badge: 'Rx required',
-          requiresPrescription: true,
-          tag: 'Strip of 15 tablets',
-          onTap: onMedicineTap,
-        ),
-      ],
-    );
-  }
-}
-
-class _InsulinDevicesTab extends StatelessWidget {
-  final VoidCallback onCgmTap;
-  const _InsulinDevicesTab({required this.onCgmTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: GridView.count(
-        crossAxisCount: 2,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 0.55,
-        children: [
-          DeviceGridCard(
-            name: 'FreeStyle Libre CGM Sensor',
-            description: '14-day continuous glucose monitoring',
-            price: '₹4,999',
-            mrp: '₹5,550',
-            discountBadge: '10% OFF',
-            rating: 4.9,
-            reviewCount: '2.1k',
-            onTap: onCgmTap,
-          ),
-          DeviceGridCard(
-            name: 'Accu-Chek Active Glucometer Kit',
-            description: 'With 10 free test strips + lancing pen',
-            price: '₹1,149',
-            mrp: '₹1,599',
-            discountBadge: '28% OFF',
-            rating: 4.8,
-            reviewCount: '1.2k',
-            onTap: onCgmTap,
-          ),
-        ],
-      ),
-    );
-  }
 }

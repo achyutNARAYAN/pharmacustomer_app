@@ -122,6 +122,10 @@ class DoorstepVerification extends StatelessWidget {
                     ),
                   ),
                   ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(0, 36),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    ),
                     onPressed: () => showDialog<void>(
                       context: context,
                       builder: (_) => AlertDialog(

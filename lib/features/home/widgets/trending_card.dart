@@ -6,6 +6,7 @@ import '../../../core/providers/cart_notifier.dart';
 import '../../../core/theme.dart';
 
 class TrendingCard extends StatelessWidget {
+  final String? id;
   final String title;
   final String subtitle;
   final String price;
@@ -15,6 +16,7 @@ class TrendingCard extends StatelessWidget {
 
   const TrendingCard({
     super.key,
+    this.id,
     required this.title,
     required this.subtitle,
     required this.price,
@@ -28,7 +30,7 @@ class TrendingCard extends StatelessWidget {
     return double.tryParse(cleaned) ?? 0;
   }
 
-  String get _cartId => title.toLowerCase().replaceAll(' ', '_');
+  String get _cartId => id ?? title.toLowerCase().replaceAll(' ', '_');
 
   @override
   Widget build(BuildContext context) {
