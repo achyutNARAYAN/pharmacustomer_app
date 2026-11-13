@@ -8,6 +8,7 @@ import '../../core/constants/app_strings.dart';
 import '../../core/models/medicine_model.dart';
 import '../../core/services/api_service.dart';
 import 'search.dart';
+import '../cart/address.dart';
 import '../medicine/medicine_detail.dart';
 import 'widgets/condition_item.dart';
 import 'widgets/prescription_banner.dart';
@@ -190,7 +191,12 @@ class _HomeState extends State<Home> {
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () {},
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute<void>(builder: (_) => const Address()),
+          );
+        },
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           child: Row(

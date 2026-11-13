@@ -3,21 +3,98 @@ import 'package:provider/provider.dart';
 import '../../core/providers/cart_notifier.dart';
 import '../../core/providers/profile_notifier.dart';
 import '../../core/theme.dart';
+import '../profile/models/customer_address.dart';
+import '../profile/providers/customer_address_provider.dart';
+import 'address.dart';
 import 'payment.dart';
 
 class DeliveryOptions extends StatefulWidget {
-  const DeliveryOptions({super.key});
+  final AddressModel? selectedAddress;
+
+  const DeliveryOptions({super.key, this.selectedAddress});
+
   @override
   State<DeliveryOptions> createState() => _DeliveryOptionsState();
 }
 
 class _DeliveryOptionsState extends State<DeliveryOptions> {
   int selected = 0;
+  AddressModel? _currentAddress;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentAddress = widget.selectedAddress;
+  }
+
+  Future<void> _changeAddress() async {
+    final chosen = await Navigator.push<AddressModel>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const Address(popOnSelect: true),
+      ),
+    );
+    if (chosen != null && mounted) {
+      setState(() {
+        _currentAddress = chosen;
+      });
+      context.read<ProfileNotifier>().setAddress(chosen.displayDetails);
+    }
+  }
+
+  String _getLabel(CustomerAddress? capAddress) {
+    if (_currentAddress != null && _currentAddress!.label.isNotEmpty) {
+      return _currentAddress!.label;
+    }
+    if (capAddress != null && capAddress.typeDisplayName.isNotEmpty) {
+      return capAddress.typeDisplayName;
+    }
+    return 'Home';
+  }
+
+  String _getFullAddress(CustomerAddress? capAddress, ProfileNotifier profile) {
+    if (_currentAddress != null && _currentAddress!.displayDetails.isNotEmpty) {
+      return _currentAddress!.displayDetails;
+    }
+    if (capAddress != null && capAddress.displayDetails.isNotEmpty) {
+      return capAddress.displayDetails;
+    }
+    if (profile.address.isNotEmpty && profile.address != 'Set delivery location') {
+      return profile.address;
+    }
+    return 'Flat 402, Lotus Residency, Road No. 12, Banjara Hills, Hyderabad, Telangana - 500034';
+  }
+
+  String _getContact(CustomerAddress? capAddress, ProfileNotifier profile) {
+    if (_currentAddress != null) {
+      final name = _currentAddress!.contactName.isNotEmpty
+          ? _currentAddress!.contactName
+          : (profile.name.isNotEmpty ? profile.name : 'Customer');
+      final mobile = _currentAddress!.contactMobile.isNotEmpty
+          ? _currentAddress!.contactMobile
+          : (profile.phoneNumber.isNotEmpty ? profile.phoneNumber : '');
+      return [name, mobile].where((s) => s.isNotEmpty).join(' • ');
+    }
+    if (capAddress != null && capAddress.contactDisplay.isNotEmpty) {
+      return capAddress.contactDisplay;
+    }
+    final name = profile.name.isNotEmpty ? profile.name : 'Customer';
+    final mobile = profile.phoneNumber.isNotEmpty ? profile.phoneNumber : '9876543210';
+    return '$name • $mobile';
+  }
+
   @override
   Widget build(BuildContext context) {
     final profile = context.watch<ProfileNotifier>();
-    final deliveryAddress = profile.address.isNotEmpty ? profile.address : 'Saved primary address';
-    final deliveryArea = profile.address.isNotEmpty ? 'Verified delivery location' : 'Default delivery destination';
+    CustomerAddressProvider? addressProvider;
+    try {
+      addressProvider = Provider.of<CustomerAddressProvider>(context);
+    } catch (_) {}
+    final capAddress = addressProvider?.selectedAddress ?? addressProvider?.defaultAddress;
+
+    final deliveryLabel = _getLabel(capAddress);
+    final deliveryAddress = _getFullAddress(capAddress, profile);
+    final deliveryContact = _getContact(capAddress, profile);
 
     return Scaffold(
     backgroundColor: AppTheme.background,
@@ -47,29 +124,101 @@ class _DeliveryOptionsState extends State<DeliveryOptions> {
         ),
         const SizedBox(height: 24),
         Container(
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(22),
             border: Border.all(color: AppTheme.outlineBorder),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(color: AppTheme.surfaceLow, borderRadius: BorderRadius.circular(16)),
-                child: const Icon(Icons.location_on, color: AppTheme.primary),
+                child: const Icon(Icons.location_on, color: AppTheme.primary, size: 26),
               ),
               const SizedBox(width: 14),
-              Expanded(child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Delivering to: $deliveryAddress', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 4),
-                  Text(deliveryArea, style: const TextStyle(color: AppTheme.mutedText)),
-                ],
-              )),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Delivering to: $deliveryLabel',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: AppTheme.text,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        InkWell(
+                          onTap: _changeAddress,
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppTheme.surfaceLow,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'Change',
+                              style: TextStyle(
+                                color: AppTheme.primary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      deliveryAddress,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppTheme.textSecondary,
+                        height: 1.35,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(Icons.check_circle_rounded, size: 14, color: AppTheme.successText),
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            deliveryContact.isNotEmpty
+                                ? '$deliveryContact · Verified location'
+                                : 'Verified delivery location',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.mutedText,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),

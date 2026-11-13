@@ -169,7 +169,7 @@ class ProfileNotifier extends ChangeNotifier implements PersistedProvider {
           if (remotePhone != null && remotePhone.isNotEmpty) phoneNumber = remotePhone;
           if (remote['addresses'] is List && (remote['addresses'] as List).isNotEmpty) {
             final first = (remote['addresses'] as List).first as Map<String, dynamic>?;
-            if (first != null && address.isEmpty) {
+            if (first != null && (address.isEmpty || address == 'Set delivery location')) {
               final line1 = first['addressLine1'] ?? '';
               final city = first['city'] ?? '';
               address = [line1, city].where((s) => s.toString().isNotEmpty).join(', ');

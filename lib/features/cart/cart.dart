@@ -4,12 +4,15 @@ import 'package:provider/provider.dart';
 import '../../core/providers/cart_notifier.dart';
 import '../../core/providers/load_status.dart';
 import '../../core/models/cart_item.dart';
+import '../auth/providers/auth_provider.dart';
+import '../../core/services/api_service.dart';
 import '../../core/theme.dart';
 import 'models/cart_models.dart';
 import '../prescriptions/providers/prescription_provider.dart';
 import '../prescriptions/repositories/prescription_repository.dart';
 import '../prescriptions/prescription_vault.dart';
 import '../prescriptions/prescription_upload_sheet.dart';
+import '../prescriptions/prescription_review.dart';
 import '../../core/providers/profile_notifier.dart';
 import 'address.dart';
 import 'coupon_offers.dart';
@@ -25,8 +28,9 @@ class Cart extends StatelessWidget {
     final isHydrating = cart.status == LoadStatus.hydrating;
     final profile = context.watch<ProfileNotifier?>();
 
-    final addressText = (profile?.address.isNotEmpty ?? false)
-        ? 'Deliver to ${profile!.address.split(',').first.trim()}…'
+    final hasValidAddress = (profile?.address.isNotEmpty ?? false) && profile!.address != 'Set delivery location';
+    final addressText = hasValidAddress
+        ? 'Deliver to ${profile.address.split(',').first.trim()}…'
         : 'Deliver to primary address…';
 
     final freeDeliveryThresholdPaise = 50000; // ₹500.00
@@ -312,6 +316,84 @@ class Cart extends StatelessWidget {
     );
   }
 
+  Future<void> _handlePrescriptionUpload(BuildContext context, CartNotifier cart) async {
+    final file = await showPrescriptionUploadSheet(context);
+    if (file == null || !context.mounted) return;
+
+    final profile = context.read<ProfileNotifier?>();
+    final pName = (profile?.name.isNotEmpty ?? false) ? profile!.name : 'Customer';
+
+    final submitted = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => PrescriptionReview(
+          file: file,
+          patientName: pName,
+        ),
+      ),
+    );
+
+    if (submitted == true && context.mounted) {
+      String rxId = 'rx_${DateTime.now().millisecondsSinceEpoch}';
+      try {
+        if (ApiService.token != null) {
+          final effectiveCustomerId = ApiService.currentCustomerId ??
+              context.read<AuthProvider?>()?.userId;
+          final res = await ApiService.uploadPrescription(
+            customerId: effectiveCustomerId,
+            patientName: pName,
+            prescriptionDate: DateTime.now(),
+            documentUrl: file.path ?? 'https://res.cloudinary.com/demo/sample_rx.pdf',
+            fileSize: file.size,
+            mimeType: file.extension == 'pdf' ? 'application/pdf' : 'image/jpeg',
+          );
+          if (res != null) {
+            final doc = res['prescription'] ?? res['data'] ?? res;
+            if (doc is Map && doc['_id'] != null) {
+              rxId = doc['_id'].toString();
+            } else if (res['_id'] != null) {
+              rxId = res['_id'].toString();
+            }
+          }
+        }
+      } catch (_) {}
+
+      if (context.mounted) {
+        final rxProvider = context.read<PrescriptionProvider?>();
+        rxProvider?.addPrescription(
+          Prescription(
+            id: rxId,
+            source: 'upload',
+            status: PrescriptionStatus.approved,
+            fileName: file.name,
+            mime: file.extension ?? 'image/jpeg',
+            sizeBytes: file.size,
+            remoteUrl: file.path,
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          ),
+        );
+
+        // Automatically link this uploaded prescription to the cart
+        await cart.attachPrescriptionId(rxId);
+
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Prescription "${file.name}" uploaded and attached!')),
+              ],
+            ),
+            backgroundColor: AppTheme.primaryDark,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   void _openPrescriptionPicker(BuildContext context, CartNotifier cart) {
     showModalBottomSheet<void>(
       context: context,
@@ -352,18 +434,24 @@ class Cart extends StatelessWidget {
                 const SizedBox(height: 16),
                 if (prescriptions.isEmpty)
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    padding: const EdgeInsets.symmetric(vertical: 20),
                     child: Center(
                       child: Column(
                         children: [
                           const Icon(Icons.description_outlined, size: 48, color: AppTheme.mutedText),
                           const SizedBox(height: 10),
-                          const Text('No prescriptions uploaded yet'),
-                          const SizedBox(height: 14),
+                          const Text('No prescriptions uploaded yet', style: TextStyle(fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Upload your doctor prescription to proceed with checkout',
+                            style: TextStyle(color: AppTheme.mutedText, fontSize: 12),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 16),
                           ElevatedButton.icon(
                             onPressed: () {
                               Navigator.pop(ctx);
-                              showPrescriptionUploadSheet(context);
+                              _handlePrescriptionUpload(context, cart);
                             },
                             icon: const Icon(Icons.upload_file),
                             label: const Text('Upload New Prescription'),
@@ -372,33 +460,103 @@ class Cart extends StatelessWidget {
                       ),
                     ),
                   )
-                else
+                else ...[
                   ...prescriptions.map((p) {
-                    final isApproved = p.status == PrescriptionStatus.approved;
+                    final isApproved = p.status == PrescriptionStatus.approved ||
+                        p.status == PrescriptionStatus.underReview;
                     final isSelected = cart.prescriptionId == p.id;
                     final dateStr = '${p.createdAt.day}/${p.createdAt.month}/${p.createdAt.year}';
-                    return ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(
-                        isApproved ? Icons.verified_user : Icons.schedule,
-                        color: isApproved ? AppTheme.primary : Colors.amber.shade800,
-                      ),
-                      title: Text(p.doctorName ?? p.fileName),
-                      subtitle: Text('Status: ${p.status.chipLabel} • $dateStr'),
-                      trailing: isSelected
-                          ? const Chip(label: Text('Attached ✓'))
-                          : ElevatedButton(
-                              onPressed: isApproved
-                                  ? () {
-                                      cart.attachPrescriptionId(p.id);
-                                      Navigator.pop(ctx);
-                                    }
-                                  : null,
-                              child: const Text('Attach'),
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Row(
+                        children: [
+                          Icon(
+                            p.status == PrescriptionStatus.approved
+                                ? Icons.verified_user
+                                : Icons.schedule,
+                            color: p.status == PrescriptionStatus.approved
+                                ? AppTheme.primary
+                                : Colors.amber.shade800,
+                            size: 24,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  p.doctorName ?? p.fileName,
+                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Status: ${p.status.chipLabel} • $dateStr',
+                                  style: const TextStyle(color: AppTheme.mutedText, fontSize: 12),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
                             ),
+                          ),
+                          const SizedBox(width: 8),
+                          isSelected
+                              ? Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.successBg,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Text(
+                                    'Attached ✓',
+                                    style: TextStyle(
+                                      color: AppTheme.successText,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                )
+                              : InkWell(
+                                  onTap: isApproved
+                                      ? () {
+                                          cart.attachPrescriptionId(p.id);
+                                          Navigator.pop(ctx);
+                                        }
+                                      : null,
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: isApproved ? AppTheme.primary : AppTheme.surfaceContainerDim,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      'Attach',
+                                      style: TextStyle(
+                                        color: isApproved ? Colors.white : AppTheme.mutedText,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                        ],
+                      ),
                     );
                   }),
-                const SizedBox(height: 12),
+                  const SizedBox(height: 14),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _handlePrescriptionUpload(context, cart);
+                    },
+                    icon: const Icon(Icons.upload_file),
+                    label: const Text('Upload New Prescription'),
+                  ),
+                ],
+                const SizedBox(height: 10),
                 OutlinedButton.icon(
                   onPressed: () {
                     final profile = context.read<ProfileNotifier?>();

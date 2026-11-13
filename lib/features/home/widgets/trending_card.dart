@@ -55,7 +55,7 @@ class TrendingCard extends StatelessWidget {
               style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppTheme.text)),
           const SizedBox(height: 2),
           Text(subtitle, style: const TextStyle(fontSize: 11, color: Colors.grey)),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -88,14 +88,14 @@ class TrendingCard extends StatelessWidget {
                         onPressed: () => context.read<CartNotifier>().remove(_cartId),
                       ),
                       AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 200),
+                        duration: const Duration(milliseconds: 100),
                         transitionBuilder: (child, anim) => ScaleTransition(scale: anim, child: child),
                         child: Text('$qty',
                             key: ValueKey(qty),
-                            style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary, fontSize: 13)),
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary, fontSize: 11)),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.add, size: 14, color: AppTheme.primary),
+                        icon: const Icon(Icons.add, size: 12, color: AppTheme.primary),
                         onPressed: () => context.read<CartNotifier>().add(
                               CartItem(id: _cartId, name: title, pack: subtitle, price: _parsedPrice),
                             ),

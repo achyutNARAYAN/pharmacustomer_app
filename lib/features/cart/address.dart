@@ -8,6 +8,8 @@ import '../../core/theme.dart';
 import '../../core/providers/cart_notifier.dart';
 import '../../core/providers/profile_notifier.dart';
 import '../../core/utils/pincode_validator.dart';
+import '../profile/models/customer_address.dart';
+import '../profile/providers/customer_address_provider.dart';
 import 'delivery_options.dart';
 
 class AddressModel {
@@ -51,7 +53,8 @@ class AddressModel {
 }
 
 class Address extends StatefulWidget {
-  const Address({super.key});
+  final bool? popOnSelect;
+  const Address({super.key, this.popOnSelect = false});
 
   @override
   State<Address> createState() => _AddressState();
@@ -79,11 +82,14 @@ class _AddressState extends State<Address> {
       }
     }
     final profile = context.read<ProfileNotifier>();
+    final defaultHomeAddress = (profile.address.isNotEmpty && profile.address != 'Set delivery location')
+        ? profile.address
+        : 'Flat 402, Lotus Residency';
     _addresses.addAll([
       AddressModel(
         id: 'addr_home',
         label: 'Home',
-        addressLine1: profile.address.isNotEmpty ? profile.address : 'Flat 402, Lotus Residency',
+        addressLine1: defaultHomeAddress,
         addressLine2: 'Road No. 12, Banjara Hills',
         landmark: 'Near Care Hospital',
         city: 'Hyderabad',
@@ -465,6 +471,42 @@ class _AddressState extends State<Address> {
                           return;
                         }
 
+                        // 1. Update ProfileNotifier with chosen delivery address
+                        context.read<ProfileNotifier>().setAddress(sel.displayDetails);
+
+                        // 2. Sync with CustomerAddressProvider
+                        try {
+                          final cap = Provider.of<CustomerAddressProvider>(context, listen: false);
+                          CustomerAddress? matched;
+                          for (final a in cap.addresses) {
+                            if (a.id == sel.id || a.displayDetails == sel.displayDetails) {
+                              matched = a;
+                              break;
+                            }
+                          }
+                          if (matched != null) {
+                            cap.selectAddress(matched);
+                          } else {
+                            final newAddr = CustomerAddress(
+                              id: sel.id ?? 'addr_${DateTime.now().millisecondsSinceEpoch}',
+                              addressLine1: sel.addressLine1,
+                              addressLine2: sel.addressLine2,
+                              landmark: sel.landmark,
+                              city: sel.city,
+                              state: sel.state,
+                              pinCode: sel.pincode,
+                              contactName: sel.contactName,
+                              contactMobile: sel.contactMobile,
+                              addressType: AddressType.fromString(sel.label),
+                              isDefault: sel.isDefault,
+                              latitude: sel.latitude,
+                              longitude: sel.longitude,
+                              eta: sel.eta,
+                            );
+                            cap.selectAddress(newAddr);
+                          }
+                        } catch (_) {}
+
                         final cart = context.read<CartNotifier>();
                         final addrId = sel.id;
                         if (addrId != null && addrId.isNotEmpty && ApiService.token != null) {
@@ -486,10 +528,19 @@ class _AddressState extends State<Address> {
                         }
                       }
                       if (!context.mounted) return;
+                      final selectedAddressModel = (_addresses.isNotEmpty && _selected < _addresses.length)
+                          ? _addresses[_selected]
+                          : null;
+
+                      if (widget.popOnSelect == true) {
+                        Navigator.pop(context, selectedAddressModel);
+                        return;
+                      }
+
                       Navigator.push(
                         context,
                         MaterialPageRoute<void>(
-                          builder: (_) => const DeliveryOptions(),
+                          builder: (_) => DeliveryOptions(selectedAddress: selectedAddressModel),
                         ),
                       );
                     },

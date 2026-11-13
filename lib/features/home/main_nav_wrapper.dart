@@ -4,8 +4,12 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../auth/providers/auth_provider.dart';
 import '../../core/providers/cart_notifier.dart';
 import '../../core/providers/profile_notifier.dart';
+import '../../core/services/api_service.dart';
+import '../prescriptions/providers/prescription_provider.dart';
+import '../prescriptions/repositories/prescription_repository.dart';
 import '../orders/providers/orders_provider.dart';
 import 'home.dart';
 import 'search.dart';
@@ -41,11 +45,14 @@ class _MainNavWrapperState extends State<MainNavWrapper> {
   void initState() {
     super.initState();
     final profile = context.read<ProfileNotifier>();
+    final initialLocation = (widget.location.isNotEmpty && widget.location != 'Set delivery location')
+        ? widget.location
+        : (profile.address != 'Set delivery location' ? profile.address : '');
     profile.initialize(
       name: widget.name,
       phoneNumber: widget.phoneNumber,
       email: widget.email,
-      address: widget.location,
+      address: initialLocation,
       workAddress: profile.workAddress,
       parentsAddress: profile.parentsAddress,
       profileImagePath: widget.profileImagePath,
@@ -80,13 +87,58 @@ class _MainNavWrapperState extends State<MainNavWrapper> {
   }
 
   Future<void> _reviewHomePrescription(PlatformFile file) async {
-    setState(() => _currentIndex = 3);
-    await Navigator.of(context).push<void>(MaterialPageRoute(
+    final patientName = context.read<ProfileNotifier>().name;
+    final pName = patientName.isNotEmpty ? patientName : 'Customer';
+    final submitted = await Navigator.of(context).push<bool>(MaterialPageRoute(
       builder: (_) => PrescriptionReview(
         file: file,
-        patientName: context.read<ProfileNotifier>().name,
+        patientName: pName,
       ),
     ));
+
+    if (submitted == true && mounted) {
+      String rxId = 'rx_${DateTime.now().millisecondsSinceEpoch}';
+      try {
+        if (ApiService.token != null) {
+          final effectiveCustomerId = ApiService.currentCustomerId ??
+              (mounted ? context.read<AuthProvider?>()?.userId : null);
+          final res = await ApiService.uploadPrescription(
+            customerId: effectiveCustomerId,
+            patientName: pName,
+            prescriptionDate: DateTime.now(),
+            documentUrl: file.path ?? 'https://res.cloudinary.com/demo/sample_rx.pdf',
+            fileSize: file.size,
+            mimeType: file.extension == 'pdf' ? 'application/pdf' : 'image/jpeg',
+          );
+          if (res != null) {
+            final doc = res['prescription'] ?? res['data'] ?? res;
+            if (doc is Map && doc['_id'] != null) {
+              rxId = doc['_id'].toString();
+            } else if (res['_id'] != null) {
+              rxId = res['_id'].toString();
+            }
+          }
+        }
+      } catch (_) {}
+
+      if (mounted) {
+        final rxProvider = context.read<PrescriptionProvider?>();
+        rxProvider?.addPrescription(
+          Prescription(
+            id: rxId,
+            source: 'upload',
+            status: PrescriptionStatus.approved,
+            fileName: file.name,
+            mime: file.extension ?? 'image/jpeg',
+            sizeBytes: file.size,
+            remoteUrl: file.path,
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          ),
+        );
+        setState(() => _currentIndex = 3);
+      }
+    }
   }
 
   @override
@@ -98,12 +150,18 @@ class _MainNavWrapperState extends State<MainNavWrapper> {
         index: _currentIndex,
         children: [
           Consumer<CustomerAddressProvider>(
-            builder: (_, addresses, _) => Home(
-              name: profile.name,
-              location: addresses.defaultAddress?.displayDetails ?? profile.address,
-              profileImagePath: profile.profileImagePath,
-              onPrescriptionUpload: _reviewHomePrescription,
-            ),
+            builder: (_, addresses, _) {
+              final loc = addresses.defaultAddress?.displayDetails ??
+                  (profile.address.isNotEmpty && profile.address != 'Set delivery location'
+                      ? profile.address
+                      : 'Set delivery location');
+              return Home(
+                name: profile.name,
+                location: loc,
+                profileImagePath: profile.profileImagePath,
+                onPrescriptionUpload: _reviewHomePrescription,
+              );
+            },
           ),
           Search(onBack: () => setState(() => _currentIndex = 0)),
           const OrderHistory(),

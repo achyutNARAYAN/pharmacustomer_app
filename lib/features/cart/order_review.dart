@@ -31,7 +31,7 @@ class OrderReview extends StatelessWidget {
         (profile.name.isNotEmpty ? profile.name : 'Customer');
     final deliveryAddress = activeAddress != null
         ? activeAddress.displayDetails
-        : (profile.address.isNotEmpty
+        : ((profile.address.isNotEmpty && profile.address != 'Set delivery location')
             ? profile.address
             : 'Primary Delivery Location');
     final addressTypeLabel = activeAddress?.typeKey ?? 'Home';
@@ -147,7 +147,7 @@ class OrderReview extends StatelessWidget {
           TextButton(
             onPressed: () => Navigator.push(
               context,
-              MaterialPageRoute<void>(builder: (_) => const Address()),
+              MaterialPageRoute<void>(builder: (_) => const Address(popOnSelect: true)),
             ),
             child: const Text('Change'),
           ),
@@ -255,7 +255,7 @@ class OrderReview extends StatelessWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute<void>(
-                              builder: (_) => const Address(),
+                              builder: (_) => const Address(popOnSelect: true),
                             ),
                           );
                         },
