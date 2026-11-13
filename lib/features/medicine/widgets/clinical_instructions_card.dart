@@ -4,10 +4,29 @@ import '../../../core/theme.dart';
 
 /// Card showing doctor dosage, therapeutic indication, and precaution warning.
 class ClinicalInstructionsCard extends StatelessWidget {
-  const ClinicalInstructionsCard({super.key});
+  final String? indication;
+  final String? dosage;
+  final String? precaution;
+
+  const ClinicalInstructionsCard({
+    super.key,
+    this.indication,
+    this.dosage,
+    this.precaution,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final effectiveIndication = indication?.isNotEmpty == true
+        ? indication!
+        : 'Prescription & therapeutic healthcare medication. Refer to medical practitioner guidance.';
+    final effectiveDosage = dosage?.isNotEmpty == true
+        ? dosage!
+        : 'Take as directed by your prescribing physician or as instructed on the package label.';
+    final effectivePrecaution = precaution?.isNotEmpty == true
+        ? precaution!
+        : 'Follow the prescribed dosage strictly. Store in a cool, dry place away from direct sunlight.';
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -31,7 +50,7 @@ class ClinicalInstructionsCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          _dosageBox(),
+          _dosageBox(effectiveDosage),
           const SizedBox(height: 14),
           const Text('THERAPEUTIC INDICATION',
               style: TextStyle(
@@ -40,26 +59,25 @@ class ClinicalInstructionsCard extends StatelessWidget {
                   color: AppTheme.mutedText,
                   letterSpacing: 0.8)),
           const SizedBox(height: 4),
-          const Text(
-              'Type 2 Diabetes Mellitus glycemic control alongside diet and exercise.',
-              style: TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
+          Text(effectiveIndication,
+              style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
           const SizedBox(height: 14),
-          _precautionBox(),
+          _precautionBox(effectivePrecaution),
         ],
       ),
     );
   }
 
-  Widget _dosageBox() => Container(
+  Widget _dosageBox(String dosageText) => Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: AppTheme.primaryContainer,
           borderRadius: BorderRadius.circular(10),
         ),
-        child: const Column(
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            const Row(
               children: [
                 Icon(Icons.receipt_long_outlined,
                     size: 14, color: AppTheme.primary),
@@ -71,23 +89,23 @@ class ClinicalInstructionsCard extends StatelessWidget {
                         fontWeight: FontWeight.w600)),
               ],
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
-              '"1 tablet twice daily after meals (Morning & Night)"',
-              style: TextStyle(
+              '"$dosageText"',
+              style: const TextStyle(
                   fontStyle: FontStyle.italic,
                   fontSize: 13,
                   color: AppTheme.text,
                   fontWeight: FontWeight.w500),
             ),
-            SizedBox(height: 4),
-            Text('Authorized by Registered Pharmacist  •  Follow meal schedule strictly',
+            const SizedBox(height: 4),
+            const Text('Authorized by Registered Pharmacist • Follow meal schedule strictly',
                 style: TextStyle(fontSize: 10, color: AppTheme.mutedText)),
           ],
         ),
       );
 
-  Widget _precautionBox() => Container(
+  Widget _precautionBox(String precautionText) => Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: AppTheme.warningBg,
@@ -95,17 +113,16 @@ class ClinicalInstructionsCard extends StatelessWidget {
           border: Border.all(
               color: AppTheme.warningText.withValues(alpha: 0.3)),
         ),
-        child: const Row(
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.warning_amber_rounded,
+            const Icon(Icons.warning_amber_rounded,
                 size: 16, color: AppTheme.warningText),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'Important Precaution: Mild nausea, headache may occur during '
-                'initial days. Do not skip meals to prevent hypoglycemia.',
-                style: TextStyle(fontSize: 11, color: AppTheme.warningText),
+                'Precaution: $precautionText',
+                style: const TextStyle(fontSize: 11, color: AppTheme.warningText),
               ),
             ),
           ],

@@ -98,7 +98,7 @@ class ProfileHome extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        name.isEmpty ? 'Achyut' : name,
+                        name.isEmpty ? 'Customer' : name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(

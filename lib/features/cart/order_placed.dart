@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/providers/cart_notifier.dart';
 import '../../core/providers/profile_notifier.dart';
 import '../../core/theme.dart';
+import 'tax_invoice.dart';
 import 'clinical_dispensing.dart';
 
 class OrderPlaced extends StatelessWidget {
@@ -29,8 +30,14 @@ class OrderPlaced extends StatelessWidget {
         ),
         actions: [
           IconButton(
-            onPressed: () {},
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) => const TaxInvoice(),
+              ),
+            ),
             icon: const Icon(Icons.receipt_long_outlined),
+            tooltip: 'View Invoice',
           ),
         ],
       ),

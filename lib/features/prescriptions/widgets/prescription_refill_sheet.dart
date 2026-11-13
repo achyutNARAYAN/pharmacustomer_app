@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme.dart';
+import '../../cart/cart.dart';
 
 Future<void> showPrescriptionRefillSheet(
   BuildContext context, {
@@ -32,15 +33,14 @@ Future<void> showPrescriptionRefillSheet(
                     Icons.shopping_bag_outlined,
                     color: AppTheme.primary,
                   ),
-                  title: const Text('Order prescribed medicines'),
-                  subtitle: const Text('Add available refills to your cart'),
+                  title: const Text('View Cart & Prescribed Medicines'),
+                  subtitle: const Text('Review and order approved items'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () {
                     Navigator.pop(sheetContext);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Prescribed medicines added to cart'),
-                      ),
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute<void>(builder: (_) => const Cart()),
                     );
                   },
                 ),

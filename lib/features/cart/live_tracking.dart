@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -7,8 +6,6 @@ import 'package:provider/provider.dart';
 import '../../core/providers/cart_notifier.dart';
 import '../../core/providers/profile_notifier.dart';
 import '../../core/theme.dart';
-import 'doorstep_verification.dart';
-import 'split_shipment_tracking.dart';
 
 class LiveTracking extends StatefulWidget {
   const LiveTracking({super.key});
@@ -30,9 +27,7 @@ class _LiveTrackingState extends State<LiveTracking> with SingleTickerProviderSt
 
   late final MapController _mapController;
   late final AnimationController _animController;
-  Timer? _timer;
-  int _currentStepIndex = 0;
-  LatLng _driverPos = _routePoints.first;
+  final LatLng _driverPos = _routePoints[3]; // Current delivery waypoint en route
 
   @override
   void initState() {
@@ -42,20 +37,10 @@ class _LiveTrackingState extends State<LiveTracking> with SingleTickerProviderSt
       vsync: this,
       duration: const Duration(milliseconds: 1800),
     );
-
-    // Periodically advance the driver along the delivery route
-    _timer = Timer.periodic(const Duration(seconds: 3), (timer) {
-      if (!mounted) return;
-      setState(() {
-        _currentStepIndex = (_currentStepIndex + 1) % _routePoints.length;
-        _driverPos = _routePoints[_currentStepIndex];
-      });
-    });
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
     _animController.dispose();
     _mapController.dispose();
     super.dispose();
@@ -464,76 +449,62 @@ class _LiveTrackingState extends State<LiveTracking> with SingleTickerProviderSt
                     const SizedBox(height: 14),
 
                     // Delivery Address Card
-                    InkWell(
-                      borderRadius: BorderRadius.circular(16),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute<void>(
-                          builder: (_) => const DoorstepVerification(),
-                        ),
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surfaceLow,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFC7EBF2)),
                       ),
-                      child: Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: AppTheme.surfaceLow,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFFC7EBF2)),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: const BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.pin_drop_rounded,
-                                color: AppTheme.primary,
-                                size: 20,
-                              ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'DELIVERY ADDRESS · PRIMARY',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 0.5,
-                                      color: AppTheme.primaryDark,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    deliveryAddress,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 14,
-                                      color: AppTheme.text,
-                                    ),
-                                  ),
-                                  const Text(
-                                    'Live GPS geocoded destination',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: AppTheme.textSecondary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const Icon(
-                              Icons.arrow_forward_ios_rounded,
-                              size: 14,
+                            child: const Icon(
+                              Icons.pin_drop_rounded,
                               color: AppTheme.primary,
+                              size: 20,
                             ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'DELIVERY ADDRESS · PRIMARY',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
+                                    color: AppTheme.primaryDark,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  deliveryAddress,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14,
+                                    color: AppTheme.text,
+                                  ),
+                                ),
+                                const Text(
+                                  'Live GPS geocoded destination',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppTheme.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
 
@@ -640,18 +611,18 @@ class _LiveTrackingState extends State<LiveTracking> with SingleTickerProviderSt
                               ),
                             ),
                           ),
-                          TextButton(
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute<void>(
-                                builder: (_) => const SplitShipmentTracking(),
-                              ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppTheme.surfaceLow,
+                              borderRadius: BorderRadius.circular(10),
                             ),
                             child: const Text(
-                              'View shipments',
+                              'Direct Dispatch',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                fontSize: 13,
+                                fontSize: 11,
+                                color: AppTheme.primaryDark,
                               ),
                             ),
                           ),

@@ -792,49 +792,19 @@ class _SearchState extends State<Search> {
               ),
             ),
             const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Available in Central Catalogue',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: AppTheme.text,
-                  ),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CategoryDetail(categoryName: 'All')),
                 ),
-                GestureDetector(
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const CategoryDetail(categoryName: 'All')),
-                  ),
-                  child: const Text(
-                    'View All >',
-                    style: TextStyle(
-                      color: AppTheme.primary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                    ),
-                  ),
+                icon: const Icon(Icons.category_outlined),
+                label: const Text('Browse Full Medicine Catalogue'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 46),
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            _buildAlternativeCard(
-              'Dolo 650 Tablet',
-              'Paracetamol IP 650mg • Micro Labs Ltd',
-              '₹35.00',
-              '₹35.00',
-              'Strip of 15',
-            ),
-            const SizedBox(height: 12),
-            _buildAlternativeCard(
-              'Pan 40 Tablet',
-              'Pantoprazole 40mg • Alkem Laboratories Ltd',
-              '₹155.00',
-              '₹155.00',
-              'Strip of 15',
-              isDetails: true,
+              ),
             ),
           ],
         ),
@@ -890,174 +860,25 @@ class _SearchState extends State<Search> {
                 ),
                 SizedBox(height: 6),
                 Text(
-                  'We found 0 matches for "Diabetes Care"',
+                  'Try clearing the filters or searching by a different generic molecule.',
                   style: TextStyle(color: Colors.grey, fontSize: 12),
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),
           ),
           const SizedBox(height: 24),
-          const Row(
-            children: [
-              Text(
-                'Popular in Central Catalogue',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: AppTheme.text,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _buildAlternativeCard(
-            'Dolo 650 Tablet',
-            'Paracetamol IP 650mg • Micro Labs Ltd',
-            '₹35.00',
-            '₹35.00',
-            'Strip of 15',
-          ),
-          const SizedBox(height: 12),
-          _buildAlternativeCard(
-            'Augmentin 625 Duo Tablet',
-            'Amoxicillin 500mg + Clavulanic Acid 125mg',
-            '₹204.00',
-            '₹204.00',
-            'Strip of 10',
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Shared card ───────────────────────────────────────────────────────────
-
-  Widget _buildAlternativeCard(
-    String name,
-    String desc,
-    String price,
-    String mrp,
-    String tag, {
-    bool isDetails = false,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: Colors.teal.shade50,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(Icons.medication, color: AppTheme.primary),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        name,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                          color: AppTheme.text,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        tag,
-                        style: const TextStyle(fontSize: 9, color: Colors.grey),
-                      ),
-                    ),
-                  ],
-                ),
-                Text(
-                  desc,
-                  style: const TextStyle(color: Colors.grey, fontSize: 11),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  price,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: AppTheme.text,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (isDetails)
-            OutlinedButton(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => MedicineDetail(
-                    medicine: Medicine(
-                      name: name,
-                      description: desc,
-                      price: price.replaceAll('₹', ''),
-                      mrp: price.replaceAll('₹', ''),
-                      discount: '',
-                      badge: tag,
-                      requiresPrescription: tag.toLowerCase().contains('rx'),
-                    ),
-                  ),
-                ),
-              ),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => setState(() => _filterColdChain = false),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Reset All Filters'),
               style: OutlinedButton.styleFrom(
-                minimumSize: const Size(80, 36),
-                side: const BorderSide(color: AppTheme.primary),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
+                minimumSize: const Size(double.infinity, 46),
               ),
-              child: const Text(
-                'View Details >',
-                style: TextStyle(color: AppTheme.primary, fontSize: 11),
-              ),
-            )
-          else
-            ElevatedButton(
-              onPressed: () => context.read<CartNotifier>().add(
-                CartItem(
-                  id: 'suggestion_$name',
-                  name: name,
-                  pack: tag,
-                  price: double.parse(price.replaceAll('₹', '')),
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary,
-                minimumSize: const Size(80, 36),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text('Add to Cart', style: TextStyle(fontSize: 11)),
             ),
+          ),
         ],
       ),
     );

@@ -5,8 +5,6 @@ import '../../core/providers/cart_notifier.dart';
 import '../../core/theme.dart';
 import 'coupon_offers.dart';
 import 'order_review.dart';
-import 'payment_declined.dart';
-import 'payment_status_recovery.dart';
 
 class Payment extends StatefulWidget {
   const Payment({super.key});
@@ -215,24 +213,6 @@ class _PaymentState extends State<Payment> {
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 16),
-          TextButton.icon(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute<void>(
-                builder: (_) => const PaymentStatusRecovery(),
-              ),
-            ),
-            icon: const Icon(Icons.sync),
-            label: const Text('Check a pending payment'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute<void>(builder: (_) => const PaymentDeclined()),
-            ),
-            child: const Text('Payment declined? View retry options'),
           ),
         ],
       ),

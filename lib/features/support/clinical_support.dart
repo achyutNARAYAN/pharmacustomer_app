@@ -292,11 +292,11 @@ class _ClinicalSupportState extends State<ClinicalSupport> {
             children: [
               IconButton(
                 onPressed: () =>
-                    _snack('Attachment picker is unavailable in this demo'),
+                    _snack('Document attachment will be enabled in next release'),
                 icon: const Icon(Icons.attach_file),
               ),
               IconButton(
-                onPressed: () => _snack('Camera is unavailable in this demo'),
+                onPressed: () => _snack('Camera access will be enabled in next release'),
                 icon: const Icon(Icons.camera_alt_outlined),
               ),
               Expanded(
@@ -312,7 +312,7 @@ class _ClinicalSupportState extends State<ClinicalSupport> {
               ),
               IconButton(
                 onPressed: () =>
-                    _snack('Voice input is unavailable in this demo'),
+                    _snack('Voice notes will be enabled in next release'),
                 icon: const Icon(Icons.mic_none),
               ),
               IconButton.filled(

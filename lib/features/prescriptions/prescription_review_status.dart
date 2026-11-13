@@ -9,9 +9,6 @@ import '../../core/models/cart_item.dart';
 import '../../core/providers/cart_notifier.dart';
 import '../../core/theme.dart';
 import 'prescription_status.dart';
-import 'prescription_partial_approval.dart';
-import 'prescription_clarification.dart';
-import 'prescription_rejection.dart';
 
 class PrescriptionReviewStatus extends StatelessWidget {
   final List<PlatformFile>? files;
@@ -135,36 +132,6 @@ class PrescriptionReviewStatus extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 12),
             child: statusPanel(child: MedicineRow(item)),
           ),
-        ),
-        const SizedBox(height: 4),
-        OutlinedButton(
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const PrescriptionPartialApproval(),
-            ),
-          ),
-          child: const Text('View Partial Approval'),
-        ),
-        const SizedBox(height: 10),
-        OutlinedButton(
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const PrescriptionClarification(),
-            ),
-          ),
-          child: const Text('View Clarification Request'),
-        ),
-        const SizedBox(height: 10),
-        OutlinedButton(
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const PrescriptionRejection(),
-            ),
-          ),
-          child: const Text('View Rejection & Refund'),
         ),
       ],
     ),
