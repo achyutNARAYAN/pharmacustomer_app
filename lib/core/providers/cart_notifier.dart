@@ -44,6 +44,13 @@ class CartNotifier extends ChangeNotifier implements PersistedProvider {
   Timer? _stockHoldTimer;
   int _remainingHoldSeconds = 0;
 
+  // ── Debounced Synchronization State ──────────────────────────────────────
+  static const Duration _debounceDuration = Duration(milliseconds: 500);
+  final Map<String, Timer> _debounceTimers = {};
+  final Map<String, int> _pendingQuantities = {};
+  final Map<String, CartItem> _pendingFallbackItems = {};
+  final Set<String> _inFlightSyncs = {};
+
   CartNotifier([this._repository, CartSnapshot? initial]) {
     if (initial != null) {
       for (final item in initial.lines) {
@@ -83,17 +90,36 @@ class CartNotifier extends ChangeNotifier implements PersistedProvider {
 
   /// Returns quantity of an item by line item ID, medicine ID, or cached slug.
   int quantityOf(String id) {
+    if (_pendingQuantities.containsKey(id)) {
+      return _pendingQuantities[id]!;
+    }
+    final mapped = _nameToObjectIdCache[id];
+    if (mapped != null && _pendingQuantities.containsKey(mapped)) {
+      return _pendingQuantities[mapped]!;
+    }
+
     if (_remoteCart != null) {
       for (final item in _remoteCart!.items) {
         if (item.id == id || item.medicineId == id) {
+          if (_pendingQuantities.containsKey(item.medicineId)) {
+            return _pendingQuantities[item.medicineId]!;
+          }
+          if (_pendingQuantities.containsKey(item.id)) {
+            return _pendingQuantities[item.id]!;
+          }
           return item.quantity;
         }
       }
     }
-    final mapped = _nameToObjectIdCache[id];
     if (mapped != null && _remoteCart != null) {
       for (final item in _remoteCart!.items) {
         if (item.id == mapped || item.medicineId == mapped) {
+          if (_pendingQuantities.containsKey(item.medicineId)) {
+            return _pendingQuantities[item.medicineId]!;
+          }
+          if (_pendingQuantities.containsKey(item.id)) {
+            return _pendingQuantities[item.id]!;
+          }
           return item.quantity;
         }
       }
@@ -212,27 +238,100 @@ class CartNotifier extends ChangeNotifier implements PersistedProvider {
     });
   }
 
+  CartModel _overlayPendingQuantities(CartModel baseCart) {
+    _pendingQuantities.removeWhere((key, targetQty) {
+      if (_inFlightSyncs.contains(key) || _debounceTimers.containsKey(key)) {
+        return false;
+      }
+      final mapped = _nameToObjectIdCache[key];
+      CartLineItem? match;
+      for (final i in baseCart.items) {
+        if (i.id == key ||
+            i.medicineId == key ||
+            (mapped != null && (i.id == mapped || i.medicineId == mapped))) {
+          match = i;
+          break;
+        }
+      }
+      if (match != null) {
+        return match.quantity == targetQty;
+      } else {
+        return targetQty <= 0;
+      }
+    });
+
+    if (_pendingQuantities.isEmpty) return baseCart;
+
+    final items = List<CartLineItem>.from(baseCart.items);
+    for (final entry in _pendingQuantities.entries) {
+      final key = entry.key;
+      final targetQty = entry.value;
+      final mapped = _nameToObjectIdCache[key];
+
+      final index = items.indexWhere((i) =>
+          i.id == key ||
+          i.medicineId == key ||
+          (mapped != null && (i.id == mapped || i.medicineId == mapped)));
+
+      if (index >= 0) {
+        if (targetQty > 0) {
+          items[index] = items[index].copyWith(quantity: targetQty);
+        } else {
+          items.removeAt(index);
+        }
+      } else if (targetQty > 0) {
+        final fallback = _pendingFallbackItems[key];
+        final pricePaise = ((fallback?.price ?? 0) * 100).round();
+        items.add(CartLineItem(
+          id: 'temp_$key',
+          medicineId: _objectIdRegExp.hasMatch(key) ? key : (mapped ?? key),
+          name: fallback?.name ?? 'Medicine',
+          quantity: targetQty,
+          pricePaise: pricePaise,
+          mrpPaise: pricePaise,
+          isPrescriptionRequired: fallback?.requiresPrescription ?? false,
+          packSize: fallback?.pack ?? '',
+        ));
+      }
+    }
+
+    final itemsTotal = items.fold<int>(0, (sum, i) => sum + (i.pricePaise * i.quantity));
+    final deliveryFee = (items.isEmpty || itemsTotal >= 50000) ? 0 : 4000;
+    final totalPayable = (itemsTotal - baseCart.discountPaise + deliveryFee).clamp(0, 999999999);
+
+    return baseCart.copyWith(
+      items: items,
+      itemsTotalPaise: itemsTotal,
+      deliveryFeePaise: deliveryFee,
+      totalPayablePaise: totalPayable,
+    );
+  }
+
   void _applyRemoteCart(CartModel cart, {CartSummary? summary, List<CartWarning>? warnings}) {
-    _remoteCart = cart;
+    CartModel effectiveCart = cart;
+    if (_pendingQuantities.isNotEmpty) {
+      effectiveCart = _overlayPendingQuantities(cart);
+    }
+    _remoteCart = effectiveCart;
     if (summary != null) _summary = summary;
     if (warnings != null) _warnings = warnings;
 
-    if (cart.allocatedStore != null && cart.allocatedStore!.isNotEmpty) {
-      _allocatedStoreId = cart.allocatedStore;
+    if (effectiveCart.allocatedStore != null && effectiveCart.allocatedStore!.isNotEmpty) {
+      _allocatedStoreId = effectiveCart.allocatedStore;
     }
 
     // Mirror to local cache for offline persistence
     _localItems.clear();
-    for (final item in cart.items) {
+    for (final item in effectiveCart.items) {
       _localItems[item.medicineId] = item.toCartItem();
     }
     _localPrescriptionIds.clear();
-    if (cart.prescriptionId != null && cart.prescriptionId!.isNotEmpty) {
-      _localPrescriptionIds.add(cart.prescriptionId!);
+    if (effectiveCart.prescriptionId != null && effectiveCart.prescriptionId!.isNotEmpty) {
+      _localPrescriptionIds.add(effectiveCart.prescriptionId!);
     }
 
-    if (cart.isLocked && cart.expiresAt != null) {
-      _startHoldTimer(cart.expiresAt!);
+    if (effectiveCart.isLocked && effectiveCart.expiresAt != null) {
+      _startHoldTimer(effectiveCart.expiresAt!);
     } else {
       _stockHoldTimer?.cancel();
       _remainingHoldSeconds = 0;
@@ -240,6 +339,201 @@ class CartNotifier extends ChangeNotifier implements PersistedProvider {
 
     _schedulePersist();
     _safeNotify();
+  }
+
+  void _applyOptimisticUpdate(String key, int newQuantity, {CartItem? fallback}) {
+    final mapped = _nameToObjectIdCache[key];
+    final resolvedMedicineId = _objectIdRegExp.hasMatch(key)
+        ? key
+        : (mapped ?? (fallback != null && _objectIdRegExp.hasMatch(fallback.id) ? fallback.id : key));
+
+    if (newQuantity > 0) {
+      if (fallback != null) {
+        _localItems[key] = fallback.copyWith(
+          quantity: newQuantity,
+          updatedAt: DateTime.now().toUtc(),
+        );
+      } else if (_localItems.containsKey(key)) {
+        _localItems[key] = _localItems[key]!.copyWith(
+          quantity: newQuantity,
+          updatedAt: DateTime.now().toUtc(),
+        );
+      }
+    } else {
+      _localItems.remove(key);
+      if (mapped != null) _localItems.remove(mapped);
+    }
+
+    if (_remoteCart != null) {
+      final items = List<CartLineItem>.from(_remoteCart!.items);
+
+      final index = items.indexWhere((i) =>
+          i.id == key ||
+          i.medicineId == key ||
+          i.medicineId == resolvedMedicineId ||
+          (mapped != null && (i.id == mapped || i.medicineId == mapped)));
+
+      if (index >= 0) {
+        if (newQuantity > 0) {
+          items[index] = items[index].copyWith(quantity: newQuantity);
+        } else {
+          items.removeAt(index);
+        }
+      } else if (newQuantity > 0) {
+        final pricePaise = ((fallback?.price ?? 0) * 100).round();
+        items.add(CartLineItem(
+          id: 'temp_$key',
+          medicineId: resolvedMedicineId,
+          name: fallback?.name ?? 'Medicine',
+          quantity: newQuantity,
+          pricePaise: pricePaise,
+          mrpPaise: pricePaise,
+          isPrescriptionRequired: fallback?.requiresPrescription ?? false,
+          packSize: fallback?.pack ?? '',
+        ));
+      }
+
+      final itemsTotal = items.fold<int>(0, (sum, i) => sum + (i.pricePaise * i.quantity));
+      final deliveryFee = (items.isEmpty || itemsTotal >= 50000) ? 0 : 4000;
+      final totalPayable = (itemsTotal - _remoteCart!.discountPaise + deliveryFee).clamp(0, 999999999);
+
+      _remoteCart = _remoteCart!.copyWith(
+        items: items,
+        itemsTotalPaise: itemsTotal,
+        deliveryFeePaise: deliveryFee,
+        totalPayablePaise: totalPayable,
+      );
+    }
+
+    _schedulePersist();
+    _safeNotify();
+  }
+
+  void _scheduleDebouncedSync(String key, {CartItem? fallback}) {
+    if (fallback != null) {
+      _pendingFallbackItems[key] = fallback;
+    }
+
+    _debounceTimers[key]?.cancel();
+    _debounceTimers[key] = Timer(_debounceDuration, () {
+      _debounceTimers.remove(key);
+      _executeSync(key);
+    });
+  }
+
+  Future<void> _executeSync(String key) async {
+    if (_disposed) return;
+    if (_inFlightSyncs.contains(key)) return;
+
+    if (!_pendingQuantities.containsKey(key)) return;
+    final targetQty = _pendingQuantities[key]!;
+
+    if (_repository == null || ApiService.token == null) {
+      _pendingQuantities.remove(key);
+      return;
+    }
+
+    CartLineItem? remoteItem;
+    final mapped = _nameToObjectIdCache[key];
+
+    if (_remoteCart != null) {
+      for (final r in _remoteCart!.items) {
+        if (_objectIdRegExp.hasMatch(r.id)) {
+          if (r.id == key ||
+              r.medicineId == key ||
+              (mapped != null && (r.id == mapped || r.medicineId == mapped))) {
+            remoteItem = r;
+            break;
+          }
+        }
+      }
+    }
+
+    _inFlightSyncs.add(key);
+    _actionError = null;
+
+    try {
+      if (remoteItem != null) {
+        if (targetQty > 0) {
+          if (remoteItem.quantity != targetQty) {
+            final updatedCart = await _repository.updateRemoteQuantity(remoteItem.id, targetQty);
+            if (updatedCart != null) {
+              _applyRemoteCart(updatedCart);
+            }
+          }
+        } else {
+          final updatedCart = await _repository.removeRemoteItem(remoteItem.id);
+          if (updatedCart != null) {
+            _applyRemoteCart(updatedCart);
+          }
+        }
+      } else {
+        if (targetQty > 0) {
+          String resolvedId = key;
+          final fallback = _pendingFallbackItems[key];
+
+          if (!_objectIdRegExp.hasMatch(resolvedId)) {
+            final cached = _nameToObjectIdCache[key] ??
+                _nameToObjectIdCache[fallback?.name ?? ''];
+            if (cached != null) {
+              resolvedId = cached;
+            } else {
+              try {
+                final query = (fallback?.name ?? key).replaceAll('_', ' ').split(' ').first;
+                final matches = await ApiService.searchMedicines(search: query);
+                for (final m in matches) {
+                  final candidate = m['_id'] as String? ?? m['id'] as String?;
+                  if (candidate != null && _objectIdRegExp.hasMatch(candidate)) {
+                    resolvedId = candidate;
+                    _nameToObjectIdCache[key] = candidate;
+                    if (fallback?.name != null) {
+                      _nameToObjectIdCache[fallback!.name] = candidate;
+                    }
+                    break;
+                  }
+                }
+              } catch (_) {}
+            }
+          }
+
+          if (_objectIdRegExp.hasMatch(resolvedId)) {
+            final updatedCart = await _repository.addRemoteItem(resolvedId, targetQty);
+            if (updatedCart != null) {
+              _applyRemoteCart(updatedCart);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[CartNotifier] Debounced sync error for $key: $e');
+      _actionError = e.toString();
+      _safeNotify();
+    } finally {
+      _inFlightSyncs.remove(key);
+
+      if (_pendingQuantities.containsKey(key)) {
+        final latestTarget = _pendingQuantities[key]!;
+        int currentServerQty = 0;
+        if (_remoteCart != null) {
+          for (final r in _remoteCart!.items) {
+            if (_objectIdRegExp.hasMatch(r.id)) {
+              if (r.id == key ||
+                  r.medicineId == key ||
+                  (mapped != null && (r.id == mapped || r.medicineId == mapped))) {
+                currentServerQty = r.quantity;
+                break;
+              }
+            }
+          }
+        }
+
+        if (latestTarget != currentServerQty) {
+          _scheduleDebouncedSync(key);
+        } else {
+          _pendingQuantities.remove(key);
+        }
+      }
+    }
   }
 
   // ── 11 Cart & Checkout REST API Integrations ──────────────────────────────
@@ -262,161 +556,41 @@ class CartNotifier extends ChangeNotifier implements PersistedProvider {
     }
   }
 
-  /// 2. Add item to cart via API (medicineId, quantity: 1..50)
+  /// 2. Add item to cart via API (medicineId, quantity: 1..50) with debouncing & optimistic UI
   Future<void> addMedicine(String medicineId, {int quantity = 1, CartItem? localFallback}) async {
-    _actionError = null;
+    final key = medicineId;
+    if (localFallback != null && localFallback.name.isNotEmpty && _objectIdRegExp.hasMatch(key)) {
+      _nameToObjectIdCache[localFallback.name] = key;
+    }
 
-    // Optimistic local update so UI reflects the addition immediately
-    final itemKey = localFallback?.id ?? medicineId;
+    final currentQty = quantityOf(key);
+    final targetQty = (currentQty + quantity).clamp(1, 50);
+
+    _pendingQuantities[key] = targetQty;
     if (localFallback != null) {
-      _localItems[itemKey] = localFallback.copyWith(
-        quantity: (_localItems[itemKey]?.quantity ?? 0) + quantity,
-        updatedAt: DateTime.now().toUtc(),
-      );
-      _schedulePersist();
-      _safeNotify();
+      _pendingFallbackItems[key] = localFallback;
     }
 
-    String resolvedId = medicineId;
-
-    // Resolve non-ObjectId identifiers (e.g. slugs or titles) to real 24-hex MongoDB ObjectIds
-    if (!_objectIdRegExp.hasMatch(resolvedId)) {
-      final cached = _nameToObjectIdCache[medicineId] ??
-          _nameToObjectIdCache[localFallback?.name ?? ''];
-      if (cached != null) {
-        resolvedId = cached;
-      } else {
-        try {
-          final query = (localFallback?.name ?? medicineId).replaceAll('_', ' ').split(' ').first;
-          final matches = await ApiService.searchMedicines(search: query);
-          if (matches.isNotEmpty) {
-            for (final m in matches) {
-              final candidate = m['_id'] as String? ?? m['id'] as String?;
-              if (candidate != null && _objectIdRegExp.hasMatch(candidate)) {
-                resolvedId = candidate;
-                _nameToObjectIdCache[medicineId] = candidate;
-                if (localFallback?.name != null) {
-                  _nameToObjectIdCache[localFallback!.name] = candidate;
-                }
-                break;
-              }
-            }
-          }
-        } catch (_) {}
-      }
-    }
-
-    // Only call the remote API if the medicineId is a valid 24-character hex MongoDB ObjectId
-    if (_objectIdRegExp.hasMatch(resolvedId) && ApiService.token != null && _repository != null) {
-      try {
-        final updatedCart = await _repository.addRemoteItem(resolvedId, quantity);
-        if (updatedCart != null) {
-          _applyRemoteCart(updatedCart);
-        }
-      } catch (e) {
-        final errorStr = e.toString();
-        // If the backend returns NOT_FOUND (404), the ID was either mock/fake or deleted.
-        // Try searching by medicine name to resolve the true live MongoDB ObjectId.
-        if (errorStr.contains('not found') || errorStr.contains('NOT_FOUND') || errorStr.contains('404')) {
-          final queryName = localFallback?.name ?? medicineId.replaceAll('_', ' ');
-          if (queryName.isNotEmpty) {
-            try {
-              final query = queryName.split(' ').first;
-              final matches = await ApiService.searchMedicines(search: query);
-              for (final m in matches) {
-                final candidate = m['_id'] as String? ?? m['id'] as String?;
-                if (candidate != null && _objectIdRegExp.hasMatch(candidate) && candidate != resolvedId) {
-                  final retryCart = await _repository.addRemoteItem(candidate, quantity);
-                  if (retryCart != null) {
-                    _nameToObjectIdCache[medicineId] = candidate;
-                    _nameToObjectIdCache[queryName] = candidate;
-                    _applyRemoteCart(retryCart);
-                    return;
-                  }
-                }
-              }
-            } catch (_) {}
-          }
-          // If still not found on remote catalogue, preserve item safely in local cart
-          debugPrint('[CartNotifier] Medicine "$resolvedId" not in remote database; preserved in local cart.');
-          _actionError = null;
-          _safeNotify();
-          return;
-        }
-
-        _actionError = e.toString();
-        _safeNotify();
-        // Never rethrow unhandled exceptions in background fire-and-forget UI calls
-      }
-    }
+    _applyOptimisticUpdate(key, targetQty, fallback: localFallback);
+    _scheduleDebouncedSync(key, fallback: localFallback);
   }
 
-  /// 3. Update quantity of existing cart line item (lineItemId: _id, quantity: 1..50)
+  /// 3. Update quantity of existing cart line item (lineItemId: _id, quantity: 1..50) with debouncing
   Future<void> updateItemQuantity(String lineItemId, int newQuantity) async {
-    _actionError = null;
-    if (newQuantity < 1) {
-      await removeCartItem(lineItemId);
-      return;
-    }
+    final key = lineItemId;
+    final targetQty = newQuantity.clamp(0, 50);
 
-    if (_objectIdRegExp.hasMatch(lineItemId) && ApiService.token != null && _repository != null) {
-      try {
-        final updatedCart = await _repository.updateRemoteQuantity(lineItemId, newQuantity);
-        if (updatedCart != null) {
-          _applyRemoteCart(updatedCart);
-          return;
-        }
-      } catch (e) {
-        _actionError = e.toString();
-        _safeNotify();
-      }
-    }
-
-    // Local fallback update
-    for (final entry in _localItems.entries) {
-      if (entry.value.id == lineItemId || entry.key == lineItemId) {
-        final updated = entry.value.copyWith(
-          quantity: newQuantity,
-          updatedAt: DateTime.now().toUtc(),
-        );
-        _localItems[entry.key] = updated;
-        _schedulePersist();
-        _safeNotify();
-        break;
-      }
-    }
+    _pendingQuantities[key] = targetQty;
+    _applyOptimisticUpdate(key, targetQty);
+    _scheduleDebouncedSync(key);
   }
 
-  /// 4. Remove a line item from active cart by line item _id
+  /// 4. Remove a line item from active cart by line item _id with debouncing
   Future<void> removeCartItem(String lineItemId) async {
-    _actionError = null;
-
-    if (_objectIdRegExp.hasMatch(lineItemId) && ApiService.token != null && _repository != null) {
-      try {
-        final updatedCart = await _repository.removeRemoteItem(lineItemId);
-        if (updatedCart != null) {
-          _applyRemoteCart(updatedCart);
-          return;
-        }
-      } catch (e) {
-        _actionError = e.toString();
-        _safeNotify();
-      }
-    }
-
-    // Local fallback removal
-    String? keyToRemove;
-    for (final entry in _localItems.entries) {
-      if (entry.value.id == lineItemId || entry.key == lineItemId) {
-        keyToRemove = entry.key;
-        break;
-      }
-    }
-    if (keyToRemove != null) {
-      _localItems.remove(keyToRemove);
-      _schedulePersist();
-      _safeNotify();
-    }
+    final key = lineItemId;
+    _pendingQuantities[key] = 0;
+    _applyOptimisticUpdate(key, 0);
+    _scheduleDebouncedSync(key);
   }
 
   /// 5. Clear entire cart
@@ -426,6 +600,14 @@ class CartNotifier extends ChangeNotifier implements PersistedProvider {
     _storeAllocationMessage = null;
     _stockHoldTimer?.cancel();
     _remainingHoldSeconds = 0;
+
+    for (final timer in _debounceTimers.values) {
+      timer.cancel();
+    }
+    _debounceTimers.clear();
+    _pendingQuantities.clear();
+    _pendingFallbackItems.clear();
+    _inFlightSyncs.clear();
 
     if (ApiService.token != null && _repository != null) {
       try {
@@ -618,63 +800,32 @@ class CartNotifier extends ChangeNotifier implements PersistedProvider {
   // ── Legacy Mutation Overrides ─────────────────────────────────────────────
 
   void add(CartItem item) {
-    CartLineItem? existingRemoteItem;
-    final mapped = _nameToObjectIdCache[item.id] ?? _nameToObjectIdCache[item.name];
-
-    if (_remoteCart != null) {
-      for (final r in _remoteCart!.items) {
-        if (r.id == item.id ||
-            r.medicineId == item.id ||
-            (mapped != null && (r.id == mapped || r.medicineId == mapped))) {
-          existingRemoteItem = r;
-          break;
-        }
-      }
+    final key = item.id;
+    if (item.name.isNotEmpty && _objectIdRegExp.hasMatch(key)) {
+      _nameToObjectIdCache[item.name] = key;
     }
 
-    if (existingRemoteItem != null) {
-      updateItemQuantity(existingRemoteItem.id, existingRemoteItem.quantity + 1);
-    } else {
-      addMedicine(item.id, quantity: 1, localFallback: item);
-    }
+    final currentQty = quantityOf(key);
+    if (currentQty >= 50) return;
+
+    final newQty = currentQty + 1;
+    _pendingQuantities[key] = newQty;
+    _pendingFallbackItems[key] = item;
+
+    _applyOptimisticUpdate(key, newQty, fallback: item);
+    _scheduleDebouncedSync(key, fallback: item);
   }
 
   void remove(String id) {
-    CartLineItem? existingRemoteItem;
-    final mapped = _nameToObjectIdCache[id];
+    final key = id;
+    final currentQty = quantityOf(key);
+    if (currentQty <= 0) return;
 
-    if (_remoteCart != null) {
-      for (final r in _remoteCart!.items) {
-        if (r.id == id ||
-            r.medicineId == id ||
-            (mapped != null && (r.id == mapped || r.medicineId == mapped))) {
-          existingRemoteItem = r;
-          break;
-        }
-      }
-    }
+    final newQty = currentQty - 1;
+    _pendingQuantities[key] = newQty;
 
-    if (existingRemoteItem != null) {
-      if (existingRemoteItem.quantity > 1) {
-        updateItemQuantity(existingRemoteItem.id, existingRemoteItem.quantity - 1);
-      } else {
-        removeCartItem(existingRemoteItem.id);
-      }
-      return;
-    }
-
-    if (!_localItems.containsKey(id)) return;
-    final current = _localItems[id]!;
-    if (current.quantity > 1) {
-      _localItems[id] = current.copyWith(
-        quantity: current.quantity - 1,
-        updatedAt: DateTime.now().toUtc(),
-      );
-    } else {
-      _localItems.remove(id);
-    }
-    _schedulePersist();
-    _safeNotify();
+    _applyOptimisticUpdate(key, newQty);
+    _scheduleDebouncedSync(key);
   }
 
   void clear() {
@@ -737,6 +888,14 @@ class CartNotifier extends ChangeNotifier implements PersistedProvider {
 
   @override
   void reset() {
+    for (final timer in _debounceTimers.values) {
+      timer.cancel();
+    }
+    _debounceTimers.clear();
+    _pendingQuantities.clear();
+    _pendingFallbackItems.clear();
+    _inFlightSyncs.clear();
+
     _stockHoldTimer?.cancel();
     _remainingHoldSeconds = 0;
     _localItems.clear();
@@ -751,6 +910,14 @@ class CartNotifier extends ChangeNotifier implements PersistedProvider {
   @override
   void dispose() {
     _disposed = true;
+    for (final timer in _debounceTimers.values) {
+      timer.cancel();
+    }
+    _debounceTimers.clear();
+    _pendingQuantities.clear();
+    _pendingFallbackItems.clear();
+    _inFlightSyncs.clear();
+
     _stockHoldTimer?.cancel();
     super.dispose();
   }

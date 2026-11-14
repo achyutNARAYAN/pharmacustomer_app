@@ -207,8 +207,8 @@ class DeliveryTrackingModel {
     final etaDisplay = 'Arriving in $parsedEtaMinutes mins';
 
     // 6. Driver Location & Route
-    // Default driver position ~1.2 km away from customer destination in the same locality
-    LatLng driverLocation = LatLng(destLat + 0.0075, destLng + 0.0065);
+    // Default driver position ~1.4 km away from customer destination along the road corridor
+    LatLng driverLocation = LatLng(destLat + 0.0045, destLng + 0.0115);
     if (data['driver'] is Map<String, dynamic>) {
       final dMap = data['driver'] as Map<String, dynamic>;
       if (dMap['location'] is Map) {

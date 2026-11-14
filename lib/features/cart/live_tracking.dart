@@ -169,16 +169,20 @@ class _LiveTrackingState extends State<LiveTracking> {
       );
 
       if (routeResult != null && routeResult.points.isNotEmpty) {
-        _cachedRoutePoints = routeResult.points;
+        final pts = List<LatLng>.from(routeResult.points);
+        final startCoord = pts.first;
+        _cachedRoutePoints = pts;
         _cachedDestination = resolvedTracking.destinationLocation;
         resolvedTracking = resolvedTracking.copyWith(
-          routePoints: routeResult.points,
+          driverLocation: startCoord,
+          routePoints: pts,
           etaMinutes: routeResult.durationMinutes,
           etaDisplay: 'Arriving in ${routeResult.durationMinutes} mins',
         );
       }
     } else {
       resolvedTracking = resolvedTracking.copyWith(
+        driverLocation: _cachedRoutePoints!.first,
         routePoints: _cachedRoutePoints,
       );
     }

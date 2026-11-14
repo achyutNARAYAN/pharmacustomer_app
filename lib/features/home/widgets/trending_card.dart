@@ -59,8 +59,15 @@ class TrendingCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(price,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.text)),
+              Expanded(
+                child: Text(
+                  price,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.text),
+                ),
+              ),
+              const SizedBox(width: 4),
               if (qty == 0)
                 ElevatedButton(
                   onPressed: () => context.read<CartNotifier>().add(
@@ -76,6 +83,7 @@ class TrendingCard extends StatelessWidget {
                 )
               else
                 Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
                   decoration: BoxDecoration(
                     color: AppTheme.primaryContainer,
                     borderRadius: BorderRadius.circular(16),
@@ -85,17 +93,26 @@ class TrendingCard extends StatelessWidget {
                     children: [
                       IconButton(
                         icon: const Icon(Icons.remove, size: 14, color: AppTheme.primary),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+                        visualDensity: VisualDensity.compact,
                         onPressed: () => context.read<CartNotifier>().remove(_cartId),
                       ),
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 100),
-                        transitionBuilder: (child, anim) => ScaleTransition(scale: anim, child: child),
-                        child: Text('$qty',
-                            key: ValueKey(qty),
-                            style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary, fontSize: 11)),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 100),
+                          transitionBuilder: (child, anim) => ScaleTransition(scale: anim, child: child),
+                          child: Text('$qty',
+                              key: ValueKey(qty),
+                              style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary, fontSize: 12)),
+                        ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.add, size: 12, color: AppTheme.primary),
+                        icon: const Icon(Icons.add, size: 14, color: AppTheme.primary),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
+                        visualDensity: VisualDensity.compact,
                         onPressed: () => context.read<CartNotifier>().add(
                               CartItem(id: _cartId, name: title, pack: subtitle, price: _parsedPrice),
                             ),
