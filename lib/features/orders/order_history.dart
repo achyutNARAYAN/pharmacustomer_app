@@ -297,7 +297,7 @@ class _OrderCard extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: () => Navigator.push(
                   context,
-                  MaterialPageRoute<void>(builder: (_) => const LiveTracking()),
+                  MaterialPageRoute<void>(builder: (_) => LiveTracking(orderId: id)),
                 ),
                 icon: const Icon(Icons.route_outlined, size: 19),
                 label: const Text('Track order'),

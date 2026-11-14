@@ -847,4 +847,35 @@ class ApiService {
     }
     return await post(ApiConstants.cartCheckout, body: body);
   }
+
+  /// 12. Fetch real-time delivery tracking for an order
+  static Future<Map<String, dynamic>?> getDeliveryTracking(String orderId) async {
+    try {
+      final res = await get(ApiConstants.deliveryTracking(orderId));
+      if (res is Map<String, dynamic>) {
+        if (res['data'] is Map<String, dynamic>) {
+          return res['data'] as Map<String, dynamic>;
+        }
+        return res;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 13. Fetch list of customer orders from backend
+  static Future<List<Map<String, dynamic>>> getOrders() async {
+    try {
+      final res = await get(ApiConstants.orders);
+      if (res is Map<String, dynamic> && res['data'] is List) {
+        return (res['data'] as List).cast<Map<String, dynamic>>();
+      } else if (res is List) {
+        return res.cast<Map<String, dynamic>>();
+      }
+      return const [];
+    } catch (_) {
+      return const [];
+    }
+  }
 }

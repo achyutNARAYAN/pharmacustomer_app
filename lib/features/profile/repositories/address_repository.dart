@@ -108,7 +108,16 @@ class ApiServiceAddressRepository implements AddressRepository {
   }
 
   @override
-  Future<List<CustomerAddress>> getAddresses() async => cachedAddresses;
+  Future<List<CustomerAddress>> getAddresses() async {
+    try {
+      final remoteList = await ApiService.getAddresses();
+      if (remoteList.isNotEmpty) {
+        _cachedAddresses.clear();
+        _parseAndAppend(remoteList);
+      }
+    } catch (_) {}
+    return cachedAddresses;
+  }
 
   @override
   Future<CustomerAddress> addAddress(CustomerAddress address) async {

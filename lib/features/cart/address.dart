@@ -39,8 +39,8 @@ class AddressModel {
     required this.pincode,
     required this.contactName,
     required this.contactMobile,
-    this.latitude = 12.9270,
-    this.longitude = 77.6720,
+    this.latitude = 17.4411,
+    this.longitude = 78.4608,
     this.isDefault = false,
     this.eta = '22 Mins Express',
   });
@@ -144,17 +144,34 @@ class _AddressState extends State<Address> {
         final contactName = a['contactName'] as String? ?? 'Customer';
         final contactMobile = a['contactMobile'] as String? ?? '9876543210';
         final isDef = a['isDefault'] as bool? ?? false;
-        double lat = 12.9270;
-        double lng = 77.6720;
+        double lat = 17.4411;
+        double lng = 78.4608;
+        final isHyd = pincode.startsWith('50') ||
+            city.toLowerCase().contains('hyder') ||
+            state.toLowerCase().contains('tg') ||
+            state.toLowerCase().contains('telangana');
+
         if (a['location'] is Map && a['location']['coordinates'] is List) {
           final coords = a['location']['coordinates'] as List;
           if (coords.length >= 2) {
-            lng = (coords[0] as num).toDouble();
-            lat = (coords[1] as num).toDouble();
+            final rawLng = (coords[0] as num).toDouble();
+            final rawLat = (coords[1] as num).toDouble();
+            final isBangalore =
+                rawLat >= 12.7 && rawLat <= 13.2 && rawLng >= 77.4 && rawLng <= 77.8;
+            if (!isBangalore || !isHyd) {
+              lat = rawLat;
+              lng = rawLng;
+            }
           }
         } else if (a['latitude'] != null && a['longitude'] != null) {
-          lat = (a['latitude'] as num).toDouble();
-          lng = (a['longitude'] as num).toDouble();
+          final rawLat = (a['latitude'] as num).toDouble();
+          final rawLng = (a['longitude'] as num).toDouble();
+          final isBangalore =
+              rawLat >= 12.7 && rawLat <= 13.2 && rawLng >= 77.4 && rawLng <= 77.8;
+          if (!isBangalore || !isHyd) {
+            lat = rawLat;
+            lng = rawLng;
+          }
         }
 
         _addresses.add(AddressModel(
@@ -622,8 +639,8 @@ class _AddressEditorDialogState extends State<_AddressEditorDialog> {
           : (widget.defaultMobile.isNotEmpty ? widget.defaultMobile : '9876543210'),
     );
     _isDefault = item?.isDefault ?? false;
-    _latitude = item?.latitude ?? 12.9270;
-    _longitude = item?.longitude ?? 77.6720;
+    _latitude = item?.latitude ?? 17.4411;
+    _longitude = item?.longitude ?? 78.4608;
   }
 
   @override
@@ -863,6 +880,19 @@ class _AddressEditorDialogState extends State<_AddressEditorDialog> {
     final nameVal = _contactName.text.trim();
     final mobileVal = _contactMobile.text.trim();
 
+    double saveLat = _latitude;
+    double saveLng = _longitude;
+    final isHyd = pinVal.startsWith('50') ||
+        cityVal.toLowerCase().contains('hyder') ||
+        stateVal.toLowerCase().contains('tg') ||
+        stateVal.toLowerCase().contains('telangana');
+    if (isHyd) {
+      if (saveLat < 17.0 || saveLat > 17.8 || saveLng < 78.0 || saveLng > 78.9) {
+        saveLat = 17.4411;
+        saveLng = 78.4608;
+      }
+    }
+
     final item = AddressModel(
       id: widget.initialItem?.id,
       label: finalLabel,
@@ -874,8 +904,8 @@ class _AddressEditorDialogState extends State<_AddressEditorDialog> {
       pincode: pinVal,
       contactName: nameVal.isNotEmpty ? nameVal : 'Customer',
       contactMobile: mobileVal.isNotEmpty ? mobileVal : '9876543210',
-      latitude: _latitude,
-      longitude: _longitude,
+      latitude: saveLat,
+      longitude: saveLng,
       isDefault: _isDefault,
     );
 

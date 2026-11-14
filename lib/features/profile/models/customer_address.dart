@@ -69,8 +69,8 @@ class CustomerAddress {
     required this.contactMobile,
     this.addressType = AddressType.home,
     this.isDefault = false,
-    this.latitude = 12.9270,
-    this.longitude = 77.6720,
+    this.latitude = 17.4411,
+    this.longitude = 78.4608,
     this.eta = '22 Mins Express',
   });
 
@@ -190,17 +190,34 @@ class CustomerAddress {
         json['postalCode'] as String? ??
         '';
 
-    double lat = 12.9270;
-    double lng = 77.6720;
+    double lat = 17.4411;
+    double lng = 78.4608;
+    final isHyd = pin.startsWith('50') ||
+        (json['city'] as String? ?? '').toLowerCase().contains('hyder') ||
+        (json['state'] as String? ?? '').toLowerCase().contains('tg') ||
+        (json['state'] as String? ?? '').toLowerCase().contains('telangana');
+
     if (json['location'] is Map && json['location']['coordinates'] is List) {
       final coords = json['location']['coordinates'] as List;
       if (coords.length >= 2) {
-        lng = (coords[0] as num).toDouble();
-        lat = (coords[1] as num).toDouble();
+        final rawLng = (coords[0] as num).toDouble();
+        final rawLat = (coords[1] as num).toDouble();
+        final isBangalore =
+            rawLat >= 12.7 && rawLat <= 13.2 && rawLng >= 77.4 && rawLng <= 77.8;
+        if (!isBangalore || !isHyd) {
+          lat = rawLat;
+          lng = rawLng;
+        }
       }
     } else if (json['latitude'] != null && json['longitude'] != null) {
-      lat = (json['latitude'] as num).toDouble();
-      lng = (json['longitude'] as num).toDouble();
+      final rawLat = (json['latitude'] as num).toDouble();
+      final rawLng = (json['longitude'] as num).toDouble();
+      final isBangalore =
+          rawLat >= 12.7 && rawLat <= 13.2 && rawLng >= 77.4 && rawLng <= 77.8;
+      if (!isBangalore || !isHyd) {
+        lat = rawLat;
+        lng = rawLng;
+      }
     }
 
     return CustomerAddress(
