@@ -17,8 +17,23 @@ import '../../core/providers/profile_notifier.dart';
 import 'address.dart';
 import 'coupon_offers.dart';
 
-class Cart extends StatelessWidget {
+class Cart extends StatefulWidget {
   const Cart({super.key});
+
+  @override
+  State<Cart> createState() => _CartState();
+}
+
+class _CartState extends State<Cart> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<CartNotifier>().refresh();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -35,7 +35,9 @@ class ApiServiceAddressRepository implements AddressRepository {
       }
     }
 
-    // Default starter addresses (HOME, WORK, OTHER) conforming to 5. Customer Address Management
+    // Default starter addresses (HOME, WORK, OTHER) only for unauthenticated guest mode
+    if (ApiService.token != null) return;
+
     _cachedAddresses.addAll([
       const CustomerAddress(
         id: 'addr_home_default',

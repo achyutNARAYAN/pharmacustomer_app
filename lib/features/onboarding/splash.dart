@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/theme.dart';
 import '../../core/providers/profile_notifier.dart';
+import '../../core/services/api_service.dart';
 import '../auth/login.dart';
 import '../auth/providers/auth_provider.dart';
 import '../home/main_nav_wrapper.dart';
@@ -23,6 +24,7 @@ class _SplashState extends State<Splash>
   @override
   void initState() {
     super.initState();
+    ApiService.warmUp();
     _ctrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),

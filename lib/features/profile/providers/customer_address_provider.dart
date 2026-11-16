@@ -64,7 +64,7 @@ class CustomerAddressProvider extends ChangeNotifier {
   }
 
   Future<void> refresh() async {
-    if (_addresses.isEmpty) {
+    if (_addresses.isEmpty || _addresses.every((a) => a.id.startsWith('addr_'))) {
       _loading = true;
       _safeNotify();
     }

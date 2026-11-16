@@ -31,6 +31,17 @@ class _AddressState extends State<Address> {
   }
 
   void _populateInitialAddresses() {
+    final addrProvider = context.read<CustomerAddressProvider?>();
+    if (addrProvider != null && addrProvider.addresses.isNotEmpty) {
+      final realAddrs = addrProvider.addresses.where((a) => !a.id.startsWith('addr_')).toList();
+      if (realAddrs.isNotEmpty) {
+        _addresses.clear();
+        _addresses.addAll(realAddrs);
+        final defIdx = _addresses.indexWhere((a) => a.isDefault);
+        if (defIdx != -1) _selected = defIdx;
+        return;
+      }
+    }
     final cached = ApiService.cachedCustomerProfile;
     if (cached != null) {
       final cust = (cached['customer'] is Map ? cached['customer'] : cached) as Map<String, dynamic>;
@@ -100,7 +111,7 @@ class _AddressState extends State<Address> {
     }
   }
 
-  Future<void> _loadRemoteAddresses() async {
+  Future<void> _loadRemoteAddresses({int retryCount = 0}) async {
     try {
       if (ApiService.token != null) {
         final profile = await ApiService.getCustomerProfile(ApiService.currentCustomerId);
@@ -112,11 +123,25 @@ class _AddressState extends State<Address> {
               setState(() {
                 _parseAndSetAddresses(remoteAddrs);
               });
+              return;
             }
           }
         }
+        if (mounted && retryCount < 2 && _addresses.every((a) => a.id.startsWith('addr_'))) {
+          await Future<void>.delayed(const Duration(seconds: 2));
+          if (mounted) {
+            return _loadRemoteAddresses(retryCount: retryCount + 1);
+          }
+        }
       }
-    } catch (_) {}
+    } catch (_) {
+      if (mounted && retryCount < 2 && _addresses.every((a) => a.id.startsWith('addr_'))) {
+        await Future<void>.delayed(const Duration(seconds: 2));
+        if (mounted) {
+          return _loadRemoteAddresses(retryCount: retryCount + 1);
+        }
+      }
+    }
   }
 
   String get _selectedLabel =>
