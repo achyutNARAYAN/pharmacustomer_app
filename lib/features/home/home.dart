@@ -4,7 +4,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
-import '../../core/constants/app_strings.dart';
 import '../../core/models/medicine_model.dart';
 import '../../core/services/api_service.dart';
 import 'search.dart';
@@ -119,7 +118,7 @@ class _HomeState extends State<Home> {
             child: const Icon(Icons.local_pharmacy_outlined, color: Colors.white, size: 20),
           ),
           const SizedBox(width: 10),
-          Text(AppStrings.appName,
+          Text('PharmaCustomer',
               style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold, fontSize: 17)),
         ],
       ),
@@ -348,7 +347,7 @@ class _HomeState extends State<Home> {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: _trendingMedicines.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        separatorBuilder: (_, _) => const SizedBox(width: 12),
         itemBuilder: (context, index) {
           final med = _trendingMedicines[index];
           return SizedBox(

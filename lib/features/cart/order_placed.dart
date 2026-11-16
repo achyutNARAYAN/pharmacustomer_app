@@ -5,7 +5,7 @@ import '../../core/providers/cart_notifier.dart';
 import '../../core/providers/profile_notifier.dart';
 import '../../core/theme.dart';
 import 'tax_invoice.dart';
-import 'clinical_dispensing.dart';
+import 'live_tracking.dart';
 
 class OrderPlaced extends StatelessWidget {
   const OrderPlaced({super.key});
@@ -151,7 +151,7 @@ class OrderPlaced extends StatelessWidget {
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute<void>(
-                builder: (_) => const ClinicalDispensing(),
+                builder: (_) => const LiveTracking(),
               ),
             ),
             icon: const Icon(Icons.local_shipping_outlined),

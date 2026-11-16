@@ -5,11 +5,8 @@ import 'core/logging/app_logger.dart';
 import 'core/providers/cart_notifier.dart';
 import 'core/providers/profile_notifier.dart';
 import 'core/storage/key_value_store.dart';
-import 'core/storage/lifecycle_flusher.dart';
-import 'core/storage/migrator.dart';
 import 'core/storage/secure_token_store.dart';
 import 'core/storage/shared_preferences_store.dart';
-import 'core/storage/user_data_registry.dart';
 import 'features/auth/models/auth_session.dart';
 import 'features/auth/providers/auth_provider.dart';
 import 'features/auth/repositories/auth_repository.dart';
@@ -32,8 +29,6 @@ class AppDependencies {
   final OrdersRepository ordersRepository;
   final PrescriptionRepository prescriptionRepository;
   final ProfileRepository profileRepository;
-  final UserDataRegistry userDataRegistry;
-  final LifecycleFlusher lifecycleFlusher;
 
   final AuthSession? session;
   final CartSnapshot initialCart;
@@ -45,8 +40,6 @@ class AppDependencies {
     required this.ordersRepository,
     required this.prescriptionRepository,
     required this.profileRepository,
-    required this.userDataRegistry,
-    required this.lifecycleFlusher,
     this.session,
     required this.initialCart,
     this.initialProfile,
@@ -56,8 +49,6 @@ class AppDependencies {
     final logger = ConsoleLogger();
     final KeyValueStore store = SharedPreferencesStore();
     final SecureTokenStore secureStore = FlutterSecureTokenStore();
-    final userDataRegistry = UserDataRegistry();
-    final migrator = Migrator();
 
     ApiService.logger = logger;
 
@@ -69,29 +60,21 @@ class AppDependencies {
 
     final cartRepo = CartRepository(
       store: store,
-      migrator: migrator,
-      userDataRegistry: userDataRegistry,
       logger: logger,
     );
 
     final ordersRepo = OrdersRepository(
       store: store,
-      userDataRegistry: userDataRegistry,
     );
 
     final prescriptionRepo = PrescriptionRepository(
       store: store,
-      userDataRegistry: userDataRegistry,
     );
 
     final profileRepo = ProfileRepository(
       store: store,
-      userDataRegistry: userDataRegistry,
       logger: logger,
     );
-
-    final lifecycleFlusher = LifecycleFlusher(userDataRegistry);
-    lifecycleFlusher.start();
 
     // 1. Restore auth session first
     RestoreResult authResult;
@@ -128,8 +111,6 @@ class AppDependencies {
       ordersRepository: ordersRepo,
       prescriptionRepository: prescriptionRepo,
       profileRepository: profileRepo,
-      userDataRegistry: userDataRegistry,
-      lifecycleFlusher: lifecycleFlusher,
       session: session,
       initialCart: initialCart,
       initialProfile: initialProfile,
@@ -176,8 +157,13 @@ class _BootstrapGateState extends State<BootstrapGate> {
         ChangeNotifierProvider(
           create: (_) => AuthProvider(
             deps.authRepository,
-            userDataRegistry: deps.userDataRegistry,
             initial: deps.session,
+            onWipeUser: (uid) => Future.wait([
+              deps.cartRepository.wipeUser(uid),
+              deps.profileRepository.wipeUser(uid),
+              deps.ordersRepository.wipeUser(uid),
+              deps.prescriptionRepository.wipeUser(uid),
+            ]),
           ),
         ),
         ChangeNotifierProxyProvider<AuthProvider, CartNotifier>(

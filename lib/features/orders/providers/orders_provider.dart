@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../../core/providers/load_status.dart';
 import '../repositories/orders_repository.dart';
 
-class OrdersProvider extends ChangeNotifier implements PersistedProvider {
+class OrdersProvider extends ChangeNotifier {
   final OrdersRepository? _repository;
   final List<OrderItem> _orders = [];
 
@@ -36,7 +36,6 @@ class OrdersProvider extends ChangeNotifier implements PersistedProvider {
     _safeNotify();
   }
 
-  @override
   Future<void> init() async {
     if (_repository == null || _userId == null) {
       _status = LoadStatus.ready;
@@ -55,7 +54,6 @@ class OrdersProvider extends ChangeNotifier implements PersistedProvider {
     _safeNotify();
   }
 
-  @override
   void bindUser(String? userId) {
     if (_userId == userId) return;
     _userId = userId;
@@ -66,12 +64,10 @@ class OrdersProvider extends ChangeNotifier implements PersistedProvider {
     });
   }
 
-  @override
   Future<void> refresh() async {
     await init();
   }
 
-  @override
   void reset() {
     _orders.clear();
     _status = LoadStatus.ready;

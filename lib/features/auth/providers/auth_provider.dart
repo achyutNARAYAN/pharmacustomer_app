@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import '../../../core/services/api_service.dart';
-import '../../../core/storage/user_data_registry.dart';
 import '../models/auth_session.dart';
 import '../repositories/auth_repository.dart';
 
@@ -13,7 +12,7 @@ enum AuthStatus {
 
 class AuthProvider extends ChangeNotifier {
   final AuthRepository _repo;
-  final UserDataRegistry userDataRegistry;
+  final Future<void> Function(String userId)? onWipeUser;
 
   AuthStatus _status = AuthStatus.unknown;
   AuthSession? _session;
@@ -21,7 +20,7 @@ class AuthProvider extends ChangeNotifier {
 
   AuthProvider(
     this._repo, {
-    required this.userDataRegistry,
+    this.onWipeUser,
     AuthSession? initial,
     AuthStatus initialStatus = AuthStatus.unknown,
   })  : _session = initial,
@@ -67,7 +66,7 @@ class AuthProvider extends ChangeNotifier {
     final oldUserId = _session?.userId;
     if (oldUserId != null && oldUserId != newSession.userId) {
       // Different user logging in -> wipe previous user data
-      await userDataRegistry.wipeUser(oldUserId);
+      await onWipeUser?.call(oldUserId);
     }
     ApiService.setToken(newSession.accessToken);
     if (newSession.userId.isNotEmpty && newSession.userId != 'u_customer') {
@@ -84,7 +83,7 @@ class AuthProvider extends ChangeNotifier {
     ApiService.setToken(null);
     ApiService.setCustomerId(null);
     if (uid != null) {
-      await userDataRegistry.wipeUser(uid);
+      await onWipeUser?.call(uid);
     }
     await _repo.clearSession();
     _session = null;

@@ -1,45 +1,47 @@
 import '../../../core/models/cart_item.dart';
 
 /// Single line item inside the MDP active/locked cart.
-class CartLineItem {
-  final String id; // Cart line item MongoDB ObjectId (_id)
+class CartLineItem extends CartItem {
   final String medicineId; // Catalog medicine ID
-  final String name;
-  final int quantity;
   final int pricePaise; // Whole integer paise (1 INR = 100 paise)
   final int mrpPaise;
-  final bool isPrescriptionRequired;
-  final String packSize;
   final String? brand;
   final String? batchNumber;
 
-  const CartLineItem({
-    required this.id,
+  CartLineItem({
+    required super.id,
     required this.medicineId,
-    required this.name,
-    required this.quantity,
+    required super.name,
+    super.quantity = 1,
     required this.pricePaise,
     required this.mrpPaise,
-    this.isPrescriptionRequired = false,
-    this.packSize = '',
+    bool isPrescriptionRequired = false,
+    String packSize = '',
     this.brand,
     this.batchNumber,
-  });
+  }) : super(
+          pack: packSize.isNotEmpty ? packSize : '1 Unit',
+          price: pricePaise / 100.0,
+          requiresPrescription: isPrescriptionRequired,
+        );
 
+  bool get isPrescriptionRequired => requiresPrescription;
+  String get packSize => pack;
   int get lineTotalPaise => pricePaise * quantity;
-  double get priceInRupees => pricePaise / 100.0;
-  double get lineTotalInRupees => lineTotalPaise / 100.0;
+  double get priceInRupees => price;
+  double get lineTotalInRupees => total;
 
   String get formattedPrice {
-    final rupees = pricePaise / 100.0;
+    final rupees = price;
     return '₹${pricePaise % 100 == 0 ? rupees.toStringAsFixed(0) : rupees.toStringAsFixed(2)}';
   }
 
   String get formattedLineTotal {
-    final rupees = lineTotalPaise / 100.0;
+    final rupees = total;
     return '₹${lineTotalPaise % 100 == 0 ? rupees.toStringAsFixed(0) : rupees.toStringAsFixed(2)}';
   }
 
+  @override
   CartLineItem copyWith({
     String? id,
     String? medicineId,
@@ -51,32 +53,29 @@ class CartLineItem {
     String? packSize,
     String? brand,
     String? batchNumber,
+    String? pack,
+    double? price,
+    bool? requiresPrescription,
+    DateTime? addedAt,
+    DateTime? updatedAt,
   }) {
+    final finalPricePaise = pricePaise ?? (price != null ? (price * 100).round() : this.pricePaise);
     return CartLineItem(
       id: id ?? this.id,
       medicineId: medicineId ?? this.medicineId,
       name: name ?? this.name,
       quantity: quantity ?? this.quantity,
-      pricePaise: pricePaise ?? this.pricePaise,
+      pricePaise: finalPricePaise,
       mrpPaise: mrpPaise ?? this.mrpPaise,
-      isPrescriptionRequired: isPrescriptionRequired ?? this.isPrescriptionRequired,
-      packSize: packSize ?? this.packSize,
+      isPrescriptionRequired: isPrescriptionRequired ?? requiresPrescription ?? this.isPrescriptionRequired,
+      packSize: packSize ?? pack ?? this.packSize,
       brand: brand ?? this.brand,
       batchNumber: batchNumber ?? this.batchNumber,
     );
   }
 
-  /// Converts to legacy CartItem for compatibility with existing UI widgets.
-  CartItem toCartItem() {
-    return CartItem(
-      id: id,
-      name: name,
-      pack: packSize.isNotEmpty ? packSize : '1 Unit',
-      price: priceInRupees,
-      quantity: quantity,
-      requiresPrescription: isPrescriptionRequired,
-    );
-  }
+  /// Converts to CartItem for compatibility with existing UI widgets.
+  CartItem toCartItem() => this;
 
   factory CartLineItem.fromJson(Map<String, dynamic> json) {
     final rawId = json['_id'] as String? ?? json['id'] as String? ?? '';
@@ -116,6 +115,7 @@ class CartLineItem {
     );
   }
 
+  @override
   Map<String, dynamic> toJson() => {
         '_id': id,
         'medicine': medicineId,

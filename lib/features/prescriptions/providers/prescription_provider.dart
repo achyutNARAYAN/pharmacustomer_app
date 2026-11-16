@@ -4,7 +4,7 @@ import '../../../core/providers/load_status.dart';
 import '../../../core/services/api_service.dart';
 import '../repositories/prescription_repository.dart';
 
-class PrescriptionProvider extends ChangeNotifier implements PersistedProvider {
+class PrescriptionProvider extends ChangeNotifier {
   final PrescriptionRepository? _repository;
   final List<Prescription> _prescriptions = [];
 
@@ -41,7 +41,6 @@ class PrescriptionProvider extends ChangeNotifier implements PersistedProvider {
     _safeNotify();
   }
 
-  @override
   Future<void> init() async {
     if (_repository == null || _userId == null) {
       _status = LoadStatus.ready;
@@ -96,7 +95,6 @@ class PrescriptionProvider extends ChangeNotifier implements PersistedProvider {
     _safeNotify();
   }
 
-  @override
   void bindUser(String? userId) {
     if (_userId == userId) return;
     _userId = userId;
@@ -107,12 +105,10 @@ class PrescriptionProvider extends ChangeNotifier implements PersistedProvider {
     });
   }
 
-  @override
   Future<void> refresh() async {
     await init();
   }
 
-  @override
   void reset() {
     _prescriptions.clear();
     _status = LoadStatus.ready;

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme.dart';
-import '../../core/constants/app_strings.dart';
 import '../../core/providers/profile_notifier.dart';
 import '../auth/login.dart';
 import '../auth/providers/auth_provider.dart';
@@ -112,7 +111,7 @@ class _SplashState extends State<Splash>
                 ),
                 const SizedBox(height: 24),
                 const Text(
-                  AppStrings.appName,
+                  'PharmaCustomer',
                   style: TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,

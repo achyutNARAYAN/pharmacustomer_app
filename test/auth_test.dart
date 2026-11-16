@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pharmacustomer_app/core/storage/secure_token_store.dart';
 import 'package:pharmacustomer_app/core/storage/shared_preferences_store.dart';
-import 'package:pharmacustomer_app/core/storage/user_data_registry.dart';
 import 'package:pharmacustomer_app/features/auth/models/auth_session.dart';
 import 'package:pharmacustomer_app/features/auth/providers/auth_provider.dart';
 import 'package:pharmacustomer_app/features/auth/repositories/auth_repository.dart';
@@ -10,21 +9,19 @@ void main() {
   group('AuthRepository and AuthProvider lifecycle', () {
     late InMemoryKeyValueStore appSettingsStore;
     late InMemorySecureTokenStore secureStore;
-    late UserDataRegistry registry;
     late AuthRepository authRepo;
     late AuthProvider authProvider;
 
     setUp(() {
       appSettingsStore = InMemoryKeyValueStore();
       secureStore = InMemorySecureTokenStore();
-      registry = UserDataRegistry();
 
       authRepo = AuthRepository(
         secureStore: secureStore,
         appSettingsStore: appSettingsStore,
       );
 
-      authProvider = AuthProvider(authRepo, userDataRegistry: registry);
+      authProvider = AuthProvider(authRepo);
     });
 
     test('reinstall guard clears keychain if app.firstRunDone is absent', () async {

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/theme.dart';
-import '../../core/constants/app_strings.dart';
 import '../../core/services/api_service.dart';
 import 'otp.dart';
 
@@ -81,14 +80,14 @@ class _LoginState extends State<Login> {
                   const Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(AppStrings.appName, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.primary)),
+                      Text('PharmaCustomer', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.primary)),
                       Text('Verified pharmacy network', style: TextStyle(fontSize: 12, color: Colors.grey)),
                     ],
                   ),
                 ],
               ),
               const SizedBox(height: 32),
-              const Text('Welcome to ${AppStrings.appName}', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppTheme.text)),
+              const Text('Welcome to PharmaCustomer', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppTheme.text)),
               const SizedBox(height: 8),
               const Text('Enter your mobile number to get started', style: TextStyle(color: Colors.grey, fontSize: 16)),
               const SizedBox(height: 32),

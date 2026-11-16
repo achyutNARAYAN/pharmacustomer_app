@@ -11,7 +11,7 @@ import 'load_status.dart';
 /// Senior Production-Grade CartNotifier managing local offline cache,
 /// 11 REST API endpoints, FinTech integer paise calculations,
 /// 4km store allocation, and 15-minute checkout stock hold countdown.
-class CartNotifier extends ChangeNotifier implements PersistedProvider {
+class CartNotifier extends ChangeNotifier {
   static final RegExp _objectIdRegExp = RegExp(r'^[0-9a-fA-F]{24}$');
 
   // Runtime cache mapping medicine names/slugs to real MongoDB ObjectIds fetched from API
@@ -45,7 +45,7 @@ class CartNotifier extends ChangeNotifier implements PersistedProvider {
   int _remainingHoldSeconds = 0;
 
   // ── Debounced Synchronization State ──────────────────────────────────────
-  static const Duration _debounceDuration = Duration(milliseconds: 500);
+  static const Duration _debounceDuration = Duration(milliseconds: 400);
   final Map<String, Timer> _debounceTimers = {};
   final Map<String, int> _pendingQuantities = {};
   final Map<String, CartItem> _pendingFallbackItems = {};
@@ -67,7 +67,7 @@ class CartNotifier extends ChangeNotifier implements PersistedProvider {
   /// otherwise returns local cached items.
   List<CartItem> get items {
     if (_remoteCart != null && _remoteCart!.items.isNotEmpty) {
-      return _remoteCart!.items.map((i) => i.toCartItem()).toList();
+      return _remoteCart!.items;
     }
     return _localItems.values.toList();
   }
@@ -840,9 +840,7 @@ class CartNotifier extends ChangeNotifier implements PersistedProvider {
     removePrescriptionId();
   }
 
-  // ── PersistedProvider Contract ────────────────────────────────────────────
-
-  @override
+  // ── Lifecycle & Hydration ──────────────────────────────────────────────────
   Future<void> init() async {
     if (_repository == null) {
       _status = LoadStatus.ready;
@@ -870,7 +868,6 @@ class CartNotifier extends ChangeNotifier implements PersistedProvider {
     }
   }
 
-  @override
   void bindUser(String? userId) {
     if (_userId == userId) return;
     _userId = userId;
@@ -881,12 +878,10 @@ class CartNotifier extends ChangeNotifier implements PersistedProvider {
     });
   }
 
-  @override
   Future<void> refresh() async {
     await syncRemoteCart();
   }
 
-  @override
   void reset() {
     for (final timer in _debounceTimers.values) {
       timer.cancel();

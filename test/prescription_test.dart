@@ -1,15 +1,13 @@
+import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pharmacustomer_app/core/providers/load_status.dart';
-import 'package:pharmacustomer_app/core/storage/envelope.dart';
 import 'package:pharmacustomer_app/core/storage/shared_preferences_store.dart';
-import 'package:pharmacustomer_app/core/storage/user_data_registry.dart';
 import 'package:pharmacustomer_app/features/prescriptions/providers/prescription_provider.dart';
 import 'package:pharmacustomer_app/features/prescriptions/repositories/prescription_repository.dart';
 
 void main() {
   group('PrescriptionRepository & Provider lifecycle & security', () {
     late InMemoryKeyValueStore store;
-    late UserDataRegistry registry;
     late PrescriptionRepository repo;
     late PrescriptionProvider provider;
 
@@ -28,11 +26,7 @@ void main() {
 
     setUp(() {
       store = InMemoryKeyValueStore();
-      registry = UserDataRegistry();
-      repo = PrescriptionRepository(
-        store: store,
-        userDataRegistry: registry,
-      );
+      repo = PrescriptionRepository(store: store);
       provider = PrescriptionProvider(repo);
     });
 
@@ -75,10 +69,9 @@ void main() {
       final raw = await store.read(repo.keyFor('user_test_1'));
       expect(raw, isNotNull);
 
-      final envelope = Envelope.decode(raw!);
-      expect(envelope, isNotNull);
-      expect(envelope!.userId, 'user_test_1');
-      expect(envelope.v, PrescriptionRepository.currentVersion);
+      final decoded = jsonDecode(raw!);
+      expect(decoded, isNotNull);
+      expect(decoded['prescriptions'], isNotEmpty);
 
       final hydrated = await repo.hydrate('user_test_1');
       expect(hydrated.length, 1);
@@ -86,16 +79,8 @@ void main() {
       expect(hydrated.first.doctorName, 'Dr. Sharma');
     });
 
-    test('hydrate returns empty list if userId does not match (data leak defense)', () async {
-      final forgedEnvelope = Envelope(
-        v: 1,
-        savedAt: DateTime.now().toUtc(),
-        userId: 'attacker_user_999',
-        data: {
-          'prescriptions': [testRx.toJson()]
-        },
-      );
-      await store.write(repo.keyFor('victim_user_1'), forgedEnvelope.encode());
+    test('hydrate returns empty list if data is invalid or corrupt', () async {
+      await store.write(repo.keyFor('victim_user_1'), 'corrupted_json_blob');
 
       final results = await repo.hydrate('victim_user_1');
       expect(results, isEmpty);

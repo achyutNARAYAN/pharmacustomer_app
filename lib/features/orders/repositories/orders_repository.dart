@@ -1,7 +1,5 @@
-import '../../../core/storage/envelope.dart';
+import 'dart:convert';
 import '../../../core/storage/key_value_store.dart';
-import '../../../core/storage/user_data_registry.dart';
-import '../../../core/storage/write_coordinator.dart';
 
 enum OrderStatus {
   placed,
@@ -76,30 +74,14 @@ class OrderItem {
   }
 }
 
-class OrdersRepository implements UserScopedStore {
-  static const int currentVersion = 1;
+class OrdersRepository {
   final KeyValueStore store;
-  final UserDataRegistry userDataRegistry;
-
-  final Map<String, WriteCoordinator> _coordinators = {};
 
   OrdersRepository({
     required this.store,
-    required this.userDataRegistry,
-  }) {
-    userDataRegistry.registerStore(this);
-  }
+  });
 
   String keyFor(String userId) => 'orders.$userId';
-
-  WriteCoordinator coordinatorFor(String userId) {
-    final key = keyFor(userId);
-    return _coordinators.putIfAbsent(key, () {
-      final c = WriteCoordinator(key: key);
-      userDataRegistry.registerCoordinator(c);
-      return c;
-    });
-  }
 
   Future<List<OrderItem>> hydrate(String userId) async {
     try {
@@ -107,10 +89,14 @@ class OrdersRepository implements UserScopedStore {
       final raw = await store.read(key);
       if (raw == null || raw.isEmpty) return [];
 
-      final envelope = Envelope.decode(raw);
-      if (envelope == null || envelope.userId != userId) return [];
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) return [];
 
-      final rawList = envelope.data['orders'];
+      final data = decoded.containsKey('data') && decoded['data'] is Map<String, dynamic>
+          ? decoded['data'] as Map<String, dynamic>
+          : decoded;
+
+      final rawList = data['orders'];
       if (rawList is! List) return [];
 
       final orders = <OrderItem>[];
@@ -127,25 +113,16 @@ class OrdersRepository implements UserScopedStore {
   }
 
   void schedulePersist(String userId, List<OrderItem> orders) {
-    final coordinator = coordinatorFor(userId);
-    coordinator.schedule(() async {
-      final key = keyFor(userId);
-      final envelope = Envelope(
-        v: currentVersion,
-        savedAt: DateTime.now().toUtc(),
-        userId: userId,
-        data: {
-          'orders': orders.take(20).map((o) => o.toJson()).toList(),
-        },
-      );
-      await store.write(key, envelope.encode());
-    });
+    final key = keyFor(userId);
+    store.write(
+      key,
+      jsonEncode({
+        'orders': orders.take(20).map((o) => o.toJson()).toList(),
+      }),
+    );
   }
 
-  @override
   Future<void> wipeUser(String userId) async {
-    final key = keyFor(userId);
-    _coordinators[key]?.cancelAndDrop();
-    await store.remove(key);
+    await store.remove(keyFor(userId));
   }
 }

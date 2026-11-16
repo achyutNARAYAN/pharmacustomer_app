@@ -29,8 +29,6 @@ class AuthRepository {
   final KeyValueStore appSettingsStore;
   final AppLogger? logger;
 
-  Completer<AuthSession>? _activeRefreshFlight;
-
   AuthRepository({
     required this.secureStore,
     required this.appSettingsStore,
@@ -110,32 +108,17 @@ class AuthRepository {
     }
   }
 
-  /// Single-flight refresh token
+  /// Refreshes session token
   Future<AuthSession> refreshToken(String refreshToken) async {
-    if (_activeRefreshFlight != null) {
-      return _activeRefreshFlight!.future;
-    }
-
-    final completer = Completer<AuthSession>();
-    _activeRefreshFlight = completer;
-
-    try {
-      final newSession = AuthSession(
-        accessToken: refreshToken,
-        refreshToken: refreshToken,
-        accessExpiresAt: DateTime.now().toUtc().add(const Duration(days: 30)),
-        userId: 'u_customer',
-      );
-      ApiService.setToken(newSession.accessToken);
-      await saveSession(newSession);
-      completer.complete(newSession);
-      return newSession;
-    } catch (e) {
-      completer.completeError(const AuthFailure('Failed to refresh token'));
-      rethrow;
-    } finally {
-      _activeRefreshFlight = null;
-    }
+    final newSession = AuthSession(
+      accessToken: refreshToken,
+      refreshToken: refreshToken,
+      accessExpiresAt: DateTime.now().toUtc().add(const Duration(days: 30)),
+      userId: 'u_customer',
+    );
+    ApiService.setToken(newSession.accessToken);
+    await saveSession(newSession);
+    return newSession;
   }
 
   Future<void> saveSession(AuthSession session) async {

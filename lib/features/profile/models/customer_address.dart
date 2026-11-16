@@ -114,6 +114,12 @@ class CustomerAddress {
     return parts.join(' • ');
   }
 
+  /// Compatibility alias for address label in UI.
+  String get label => addressType.displayName;
+
+  /// Compatibility alias for PIN code.
+  String get pincode => pinCode;
+
   CustomerAddress copyWith({
     String? id,
     String? addressLine1,
@@ -269,4 +275,7 @@ class CustomerAddress {
       addressType.hashCode ^
       isDefault.hashCode;
 }
+
+/// Backward compatibility alias for CustomerAddress in legacy cart screens.
+typedef AddressModel = CustomerAddress;
 

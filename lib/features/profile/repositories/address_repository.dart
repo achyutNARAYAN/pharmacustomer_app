@@ -1,4 +1,3 @@
-import 'package:uuid/uuid.dart';
 import '../../../core/services/api_service.dart';
 import '../models/customer_address.dart';
 
@@ -13,7 +12,6 @@ abstract interface class AddressRepository {
 
 class ApiServiceAddressRepository implements AddressRepository {
   final List<CustomerAddress> _cachedAddresses = [];
-  final Uuid _uuid = const Uuid();
 
   @override
   List<CustomerAddress> get cachedAddresses => List.unmodifiable(_cachedAddresses);
@@ -123,7 +121,7 @@ class ApiServiceAddressRepository implements AddressRepository {
   Future<CustomerAddress> addAddress(CustomerAddress address) async {
     var toAdd = address;
     if (toAdd.id.isEmpty) {
-      toAdd = toAdd.copyWith(id: 'addr_${_uuid.v4().substring(0, 8)}');
+      toAdd = toAdd.copyWith(id: 'addr_${DateTime.now().millisecondsSinceEpoch}');
     }
 
     if (toAdd.isDefault) {

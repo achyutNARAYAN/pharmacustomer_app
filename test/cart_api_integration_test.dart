@@ -6,8 +6,6 @@ import 'package:pharmacustomer_app/core/models/cart_item.dart';
 import 'package:pharmacustomer_app/core/providers/cart_notifier.dart';
 import 'package:pharmacustomer_app/core/services/api_service.dart';
 import 'package:pharmacustomer_app/core/storage/key_value_store.dart';
-import 'package:pharmacustomer_app/core/storage/migrator.dart';
-import 'package:pharmacustomer_app/core/storage/user_data_registry.dart';
 import 'package:pharmacustomer_app/features/cart/models/cart_models.dart';
 import 'package:pharmacustomer_app/features/cart/repositories/cart_repository.dart';
 
@@ -572,9 +570,7 @@ void main() {
     // ── CartNotifier Reactive State Flow ─────────────────────────────────────
     test('CartNotifier reacts to API actions and maintains synchronized state', () async {
       final store = InMemoryKeyValueStore();
-      final migrator = Migrator();
-      final registry = UserDataRegistry();
-      final repo = CartRepository(store: store, migrator: migrator, userDataRegistry: registry);
+      final repo = CartRepository(store: store);
 
       final notifier = CartNotifier(repo);
 
@@ -660,9 +656,7 @@ void main() {
 
     test('CartNotifier resolves slugs to MongoDB ObjectId or handles offline fallback gracefully', () async {
       final store = InMemoryKeyValueStore();
-      final migrator = Migrator();
-      final registry = UserDataRegistry();
-      final repo = CartRepository(store: store, migrator: migrator, userDataRegistry: registry);
+      final repo = CartRepository(store: store);
 
       final notifier = CartNotifier(repo);
 

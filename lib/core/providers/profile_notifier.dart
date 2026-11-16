@@ -4,7 +4,7 @@ import '../services/api_service.dart';
 import '../../features/profile/repositories/profile_repository.dart';
 import 'load_status.dart';
 
-class ProfileNotifier extends ChangeNotifier implements PersistedProvider {
+class ProfileNotifier extends ChangeNotifier {
   final ProfileRepository? _repository;
 
   String _userId = '';
@@ -142,7 +142,6 @@ class ProfileNotifier extends ChangeNotifier implements PersistedProvider {
     _safeNotify();
   }
 
-  @override
   Future<void> init() async {
     if (_repository == null || _userId.isEmpty) {
       _status = LoadStatus.ready;
@@ -183,7 +182,6 @@ class ProfileNotifier extends ChangeNotifier implements PersistedProvider {
     _safeNotify();
   }
 
-  @override
   void bindUser(String? userId) {
     final nextId = userId ?? '';
     if (_userId == nextId) return;
@@ -195,12 +193,10 @@ class ProfileNotifier extends ChangeNotifier implements PersistedProvider {
     });
   }
 
-  @override
   Future<void> refresh() async {
     await init();
   }
 
-  @override
   void reset() {
     name = '';
     phoneNumber = '';

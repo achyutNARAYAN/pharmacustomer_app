@@ -7,8 +7,7 @@ import '../../core/models/medicine_model.dart';
 import '../../core/models/cart_item.dart';
 import '../cart/cart.dart';
 import '../../core/theme.dart';
-import '../../core/utils/prescription_uploader.dart';
-import '../../core/constants/app_strings.dart';
+import '../prescriptions/prescription_upload_sheet.dart';
 import '../../core/services/api_service.dart';
 import '../category/category_detail.dart';
 import '../medicine/medicine_detail.dart';
@@ -98,7 +97,7 @@ class _SearchState extends State<Search> {
               _fetchLiveMedicines(val.trim());
             },
             decoration: InputDecoration(
-              hintText: AppStrings.searchHint,
+              hintText: 'Search medicines, brands, generics...',
               prefixIcon: const Icon(
                 Icons.search,
                 color: AppTheme.primary,
@@ -780,7 +779,7 @@ class _SearchState extends State<Search> {
                   ),
                   const SizedBox(height: 12),
                   ElevatedButton.icon(
-                    onPressed: () => pickPrescription(context),
+                    onPressed: () => showPrescriptionUploadSheet(context),
                     icon: const Icon(Icons.camera_alt_outlined, size: 16),
                     label: const Text('Upload Prescription Now'),
                     style: ElevatedButton.styleFrom(

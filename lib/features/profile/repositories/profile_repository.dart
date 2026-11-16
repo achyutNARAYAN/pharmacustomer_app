@@ -1,8 +1,6 @@
+import 'dart:convert';
 import '../../../core/logging/app_logger.dart';
-import '../../../core/storage/envelope.dart';
 import '../../../core/storage/key_value_store.dart';
-import '../../../core/storage/user_data_registry.dart';
-import '../../../core/storage/write_coordinator.dart';
 
 class UserProfile {
   final String id;
@@ -90,32 +88,16 @@ class UserProfile {
   }
 }
 
-class ProfileRepository implements UserScopedStore {
-  static const int currentVersion = 1;
+class ProfileRepository {
   final KeyValueStore store;
-  final UserDataRegistry userDataRegistry;
   final AppLogger? logger;
-
-  final Map<String, WriteCoordinator> _coordinators = {};
 
   ProfileRepository({
     required this.store,
-    required this.userDataRegistry,
     this.logger,
-  }) {
-    userDataRegistry.registerStore(this);
-  }
+  });
 
   String keyFor(String userId) => 'profile.$userId';
-
-  WriteCoordinator coordinatorFor(String userId) {
-    final key = keyFor(userId);
-    return _coordinators.putIfAbsent(key, () {
-      final c = WriteCoordinator(key: key, logger: logger);
-      userDataRegistry.registerCoordinator(c);
-      return c;
-    });
-  }
 
   Future<UserProfile?> hydrate(String userId) async {
     final key = keyFor(userId);
@@ -123,10 +105,14 @@ class ProfileRepository implements UserScopedStore {
       final raw = await store.read(key);
       if (raw == null || raw.isEmpty) return null;
 
-      final envelope = Envelope.decode(raw);
-      if (envelope == null || envelope.userId != userId) return null;
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) return null;
 
-      return UserProfile.fromJson(envelope.data);
+      final data = decoded.containsKey('data') && decoded['data'] is Map<String, dynamic>
+          ? decoded['data'] as Map<String, dynamic>
+          : decoded;
+
+      return UserProfile.fromJson(data);
     } catch (e, st) {
       logger?.error('Error hydrating profile for $userId', e, st);
       return null;
@@ -134,23 +120,11 @@ class ProfileRepository implements UserScopedStore {
   }
 
   void schedulePersist(UserProfile profile) {
-    final coordinator = coordinatorFor(profile.id);
-    coordinator.schedule(() async {
-      final key = keyFor(profile.id);
-      final envelope = Envelope(
-        v: currentVersion,
-        savedAt: DateTime.now().toUtc(),
-        userId: profile.id,
-        data: profile.toJson(),
-      );
-      await store.write(key, envelope.encode());
-    });
+    final key = keyFor(profile.id);
+    store.write(key, jsonEncode(profile.toJson()));
   }
 
-  @override
   Future<void> wipeUser(String userId) async {
-    final key = keyFor(userId);
-    _coordinators[key]?.cancelAndDrop();
-    await store.remove(key);
+    await store.remove(keyFor(userId));
   }
 }

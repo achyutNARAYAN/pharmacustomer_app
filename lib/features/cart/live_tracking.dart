@@ -7,7 +7,6 @@ import 'package:provider/provider.dart';
 import '../../core/providers/cart_notifier.dart';
 import '../../core/providers/profile_notifier.dart';
 import '../../core/services/api_service.dart';
-import '../../core/services/route_service.dart';
 import '../../core/theme.dart';
 import '../../core/utils/address_coordinate_resolver.dart';
 import '../orders/providers/orders_provider.dart';
@@ -161,28 +160,22 @@ class _LiveTrackingState extends State<LiveTracking> {
       fallbackItemNames: fallbackItems.isNotEmpty ? fallbackItems : null,
     );
 
-    // ── SINGLE CONSISTENT REAL ROAD ROUTE (Driver -> Customer) ─────────────
-    if (_cachedRoutePoints == null || _cachedDestination != resolvedTracking.destinationLocation) {
-      final routeResult = await RouteService.getDrivingRoute(
-        origin: resolvedTracking.driverLocation,
-        destination: resolvedTracking.destinationLocation,
+    // ── ROAD ROUTE (Backend points if available, otherwise local curved waypoints) ──
+    if (resolvedTracking.routePoints.length > 2) {
+      _cachedRoutePoints = resolvedTracking.routePoints;
+      _cachedDestination = resolvedTracking.destinationLocation;
+    } else if (_cachedRoutePoints == null || _cachedDestination != resolvedTracking.destinationLocation) {
+      final pts = _generateCurvedRoute(
+        resolvedTracking.driverLocation,
+        resolvedTracking.destinationLocation,
       );
-
-      if (routeResult != null && routeResult.points.isNotEmpty) {
-        final pts = List<LatLng>.from(routeResult.points);
-        final startCoord = pts.first;
-        _cachedRoutePoints = pts;
-        _cachedDestination = resolvedTracking.destinationLocation;
-        resolvedTracking = resolvedTracking.copyWith(
-          driverLocation: startCoord,
-          routePoints: pts,
-          etaMinutes: routeResult.durationMinutes,
-          etaDisplay: 'Arriving in ${routeResult.durationMinutes} mins',
-        );
-      }
+      _cachedRoutePoints = pts;
+      _cachedDestination = resolvedTracking.destinationLocation;
+      resolvedTracking = resolvedTracking.copyWith(
+        routePoints: pts,
+      );
     } else {
       resolvedTracking = resolvedTracking.copyWith(
-        driverLocation: _cachedRoutePoints!.first,
         routePoints: _cachedRoutePoints,
       );
     }
@@ -195,6 +188,21 @@ class _LiveTrackingState extends State<LiveTracking> {
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) => _fitMapBounds());
+  }
+
+  static List<LatLng> _generateCurvedRoute(LatLng start, LatLng end) {
+    final latDiff = end.latitude - start.latitude;
+    final lngDiff = end.longitude - start.longitude;
+
+    return [
+      start,
+      LatLng(start.latitude + latDiff * 0.20, start.longitude + lngDiff * 0.05),
+      LatLng(start.latitude + latDiff * 0.38, start.longitude + lngDiff * 0.32),
+      LatLng(start.latitude + latDiff * 0.60, start.longitude + lngDiff * 0.58),
+      LatLng(start.latitude + latDiff * 0.82, start.longitude + lngDiff * 0.75),
+      LatLng(start.latitude + latDiff * 0.94, start.longitude + lngDiff * 0.96),
+      end,
+    ];
   }
 
   void _fitMapBounds() {

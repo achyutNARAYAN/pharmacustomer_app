@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/models/cart_item.dart';
+import '../../core/models/medicine_model.dart';
+import '../../core/providers/cart_notifier.dart';
 import '../../core/services/api_service.dart';
 import '../../core/theme.dart';
-import '../../core/models/medicine_model.dart';
-import '../../core/utils/prescription_uploader.dart';
-import 'medicine_detail_extended.dart';
+import '../prescriptions/prescription_upload_sheet.dart';
+import 'widgets/clinical_instructions_card.dart';
+import 'widgets/delivery_banner.dart';
 import 'widgets/medicine_hero_card.dart';
 import 'widgets/prescription_required_banner.dart';
 
-/// Prescription-upload variant — shown when Rx is required and the user
-/// hasn't yet uploaded a prescription.
 class MedicineDetail extends StatefulWidget {
   final Medicine medicine;
   const MedicineDetail({super.key, required this.medicine});
@@ -20,6 +22,8 @@ class MedicineDetail extends StatefulWidget {
 
 class _MedicineDetailState extends State<MedicineDetail> {
   late Medicine _medicine;
+  bool _isPrescriptionUploaded = false;
+  int _quantity = 1;
 
   @override
   void initState() {
@@ -42,20 +46,42 @@ class _MedicineDetailState extends State<MedicineDetail> {
     }
   }
 
+  bool get _canAddToCart =>
+      !_medicine.requiresPrescription || _isPrescriptionUploaded;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.background,
-      appBar: _buildAppBar(context),
+      appBar: AppBar(
+        backgroundColor: AppTheme.background,
+        elevation: 0,
+        leading: const BackButton(color: AppTheme.text),
+        title: const Text(
+          'Medicine Details',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.text),
+        ),
+        actions: [
+          IconButton(icon: const Icon(Icons.favorite_border, color: AppTheme.text), onPressed: () {}),
+          IconButton(icon: const Icon(Icons.share_outlined, color: AppTheme.text), onPressed: () {}),
+        ],
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (_canAddToCart) ...[
+              const DeliveryBanner(),
+              const SizedBox(height: 16),
+            ],
             MedicineHeroCard(medicine: _medicine),
             const SizedBox(height: 16),
-            const PrescriptionRequiredBanner(),
-            const SizedBox(height: 24),
+            if (!_canAddToCart)
+              const PrescriptionRequiredBanner()
+            else
+              const ClinicalInstructionsCard(),
+            const SizedBox(height: 80),
           ],
         ),
       ),
@@ -63,34 +89,12 @@ class _MedicineDetailState extends State<MedicineDetail> {
     );
   }
 
-  // ── AppBar ────────────────────────────────────────────────────────────────
-
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
-    return AppBar(
-      backgroundColor: AppTheme.background,
-      elevation: 0,
-      leading: const BackButton(color: AppTheme.text),
-      title: const Text('Medicine Details',
-          style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-              color: AppTheme.text)),
-      actions: [
-        IconButton(
-            icon: const Icon(Icons.favorite_border, color: AppTheme.text),
-            onPressed: () {}),
-        IconButton(
-            icon: const Icon(Icons.share_outlined, color: AppTheme.text),
-            onPressed: () {}),
-      ],
-    );
-  }
-
-  // ── Bottom bar ────────────────────────────────────────────────────────────
-
   Widget _buildBottomBar(BuildContext context) {
+    final price = double.tryParse(_medicine.price.replaceAll('₹', '').replaceAll(',', '').trim()) ?? 0.0;
+    final cartId = _medicine.id ?? _medicine.name;
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(top: BorderSide(color: AppTheme.outlineBorder)),
@@ -98,65 +102,113 @@ class _MedicineDetailState extends State<MedicineDetail> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          if (!_canAddToCart)
+            Row(
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                  Text('Payable Amount',
-                      style: TextStyle(
-                          fontSize: 11, color: AppTheme.mutedText)),
-                  Row(
-                    children: [
-                      Text('₹${_medicine.price}',
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: AppTheme.text)),
-                      const SizedBox(width: 6),
-                      Text('₹${_medicine.mrp}',
-                          style: const TextStyle(
-                              decoration: TextDecoration.lineThrough,
-                              color: AppTheme.mutedText,
-                              fontSize: 10)),
-                    ],
-                  ),
-                ],
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 16),
-                  child: ElevatedButton.icon(
-                    onPressed: () => pickPrescription(
-                      context,
-                      onFilePicked: (_) => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => MedicineDetailExtended(medicine: _medicine)),
+                    const Text('Payable Amount', style: TextStyle(fontSize: 11, color: AppTheme.mutedText)),
+                    Row(
+                      children: [
+                        Text('₹${_medicine.price}',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.text)),
+                        const SizedBox(width: 6),
+                        Text('₹${_medicine.mrp}',
+                            style: const TextStyle(
+                                decoration: TextDecoration.lineThrough, color: AppTheme.mutedText, fontSize: 10)),
+                      ],
+                    ),
+                  ],
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 16),
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        final file = await showPrescriptionUploadSheet(context);
+                        if (file != null && mounted) {
+                          setState(() => _isPrescriptionUploaded = true);
+                        }
+                      },
+                      icon: const Icon(Icons.upload_file, size: 16),
+                      label: const Text('Upload prescription',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size(0, 50),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                     ),
-                    icon: const Icon(Icons.upload_file, size: 16),
-                    label: const Text('Upload prescription',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  ),
+                ),
+              ],
+            )
+          else
+            Row(
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppTheme.outlineBorder),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.remove, size: 18, color: AppTheme.primary),
+                        onPressed: () => setState(() => _quantity = (_quantity - 1).clamp(1, 50)),
+                      ),
+                      Text('$_quantity',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.text)),
+                      IconButton(
+                        icon: const Icon(Icons.add, size: 18, color: AppTheme.primary),
+                        onPressed: () => setState(() => _quantity = (_quantity + 1).clamp(1, 50)),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      final cart = context.read<CartNotifier>();
+                      final item = CartItem(
+                        id: cartId,
+                        name: _medicine.name,
+                        pack: _medicine.tag ?? '',
+                        price: price,
+                        quantity: _quantity,
+                        requiresPrescription: _medicine.requiresPrescription,
+                      );
+                      cart.addMedicine(cartId, quantity: _quantity, localFallback: item);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('$_quantity × ${_medicine.name} added to cart'),
+                          backgroundColor: AppTheme.primary,
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      );
+                    },
                     style: ElevatedButton.styleFrom(
                       minimumSize: const Size(0, 50),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
+                    child: Text(
+                      'Add to Cart  ₹${(price * _quantity).toStringAsFixed(0)}',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
           const SizedBox(height: 8),
           const Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.security_outlined,
-                  size: 12, color: AppTheme.mutedText),
+              Icon(Icons.security_outlined, size: 12, color: AppTheme.mutedText),
               SizedBox(width: 4),
-              Text(
-                  'Genuine medicine • Verified pharmacy',
-                  style: TextStyle(
-                      fontSize: 10, color: AppTheme.mutedText)),
+              Text('Genuine medicine • Verified pharmacy',
+                  style: TextStyle(fontSize: 10, color: AppTheme.mutedText)),
             ],
           ),
         ],

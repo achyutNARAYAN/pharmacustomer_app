@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 
 import '../../core/theme.dart';
-import 'prescription_review_status.dart';
 import 'prescription_upload_sheet.dart';
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -661,13 +660,7 @@ class PrescriptionSubmitted extends StatelessWidget {
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton.icon(
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              PrescriptionReviewStatus(files: files),
-                        ),
-                      ),
+                      onPressed: () => Navigator.pop(context, true),
                       icon: const Icon(Icons.assignment_outlined, size: 18),
                       label: const Text('Track Pharmacist Review'),
                     ),

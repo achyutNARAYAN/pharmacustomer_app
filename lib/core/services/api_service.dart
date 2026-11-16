@@ -863,19 +863,4 @@ class ApiService {
       return null;
     }
   }
-
-  /// 13. Fetch list of customer orders from backend
-  static Future<List<Map<String, dynamic>>> getOrders() async {
-    try {
-      final res = await get(ApiConstants.orders);
-      if (res is Map<String, dynamic> && res['data'] is List) {
-        return (res['data'] as List).cast<Map<String, dynamic>>();
-      } else if (res is List) {
-        return res.cast<Map<String, dynamic>>();
-      }
-      return const [];
-    } catch (_) {
-      return const [];
-    }
-  }
 }

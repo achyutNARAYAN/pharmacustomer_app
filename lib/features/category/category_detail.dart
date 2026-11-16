@@ -165,7 +165,7 @@ class _CategoryDetailState extends State<CategoryDetail>
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         itemCount: list.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        separatorBuilder: (_, _) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
           final med = list[index];
           return MedicineListCard(

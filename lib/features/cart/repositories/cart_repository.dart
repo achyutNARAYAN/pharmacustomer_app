@@ -1,35 +1,23 @@
-import 'package:flutter/foundation.dart';
+import 'dart:convert';
+import 'dart:math';
 import '../../../core/logging/app_logger.dart';
-import '../../../core/storage/envelope.dart';
+import '../../../core/models/cart_item.dart';
 import '../../../core/storage/key_value_store.dart';
-import '../../../core/storage/migrator.dart';
-import '../../../core/storage/user_data_registry.dart';
-import '../../../core/storage/write_coordinator.dart';
-import '../models/cart_merge_policy.dart';
 import '../models/cart_snapshot.dart';
 
 import '../../../core/services/api_service.dart';
 import '../models/cart_models.dart';
 
-class CartRepository implements UserScopedStore {
-  static const int currentVersion = 1;
+class CartRepository {
   static const String guestKey = 'cart.guest';
 
   final KeyValueStore store;
-  final Migrator migrator;
-  final UserDataRegistry userDataRegistry;
   final AppLogger? logger;
-
-  final Map<String, WriteCoordinator> _coordinators = {};
 
   CartRepository({
     required this.store,
-    required this.migrator,
-    required this.userDataRegistry,
     this.logger,
-  }) {
-    userDataRegistry.registerStore(this);
-  }
+  });
 
   // ── Remote API Integration (Module 5: 11 Endpoints) ───────────────────────
 
@@ -51,7 +39,7 @@ class CartRepository implements UserScopedStore {
     try {
       final envelope = await fetchRemoteCartEnvelope();
       if (envelope != null) {
-        final lines = envelope.cart.items.map((i) => i.toCartItem()).toList();
+        final lines = envelope.cart.items;
         final rxList = envelope.cart.prescriptionId != null ? [envelope.cart.prescriptionId!] : <String>[];
         return CartSnapshot(
           lines: lines,
@@ -223,84 +211,35 @@ class CartRepository implements UserScopedStore {
     return 'cart.$userId';
   }
 
-  WriteCoordinator coordinatorFor(String? userId) {
-    final key = keyFor(userId);
-    return _coordinators.putIfAbsent(key, () {
-      final c = WriteCoordinator(key: key, logger: logger);
-      userDataRegistry.registerCoordinator(c);
-      return c;
-    });
-  }
-
   /// Hydrate cart for a user (or guest).
-  /// Never throws: invalid blobs are discarded and return empty snapshot.
   Future<CartSnapshot> hydrate(String? userId) async {
     final key = keyFor(userId);
     try {
       final raw = await store.read(key);
-      if (raw == null || raw.isEmpty) {
-        return CartSnapshot.empty;
-      }
+      if (raw == null || raw.isEmpty) return CartSnapshot.empty;
 
-      final envelope = Envelope.decode(raw);
-      if (envelope == null) {
-        await _handleCorruptBlob(key, raw);
-        return CartSnapshot.empty;
-      }
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) return CartSnapshot.empty;
 
-      // Check userId match: guest cart envelope has null userId, user cart has matching userId
-      if (envelope.userId != userId) {
-        logger?.warning('Cart envelope userId mismatch: expected $userId, got ${envelope.userId}');
-        return CartSnapshot.empty;
-      }
+      final data = decoded.containsKey('data') && decoded['data'] is Map<String, dynamic>
+          ? decoded['data'] as Map<String, dynamic>
+          : decoded;
 
-      Envelope? currentEnvelope = envelope;
-      if (envelope.v != currentVersion) {
-        currentEnvelope = migrator.migrate(envelope, currentVersion);
-        if (currentEnvelope == null) {
-          logger?.warning('Failed to migrate cart from version ${envelope.v}');
-          return CartSnapshot.empty;
-        }
-      }
-
-      final snapshot = CartSnapshot.fromJson(currentEnvelope.data);
-      if (snapshot == null) {
-        await _handleCorruptBlob(key, raw);
-        return CartSnapshot.empty;
-      }
-
-      return snapshot;
+      return CartSnapshot.fromJson(data) ?? CartSnapshot.empty;
     } catch (e, st) {
       logger?.error('Error hydrating cart for $key', e, st);
       return CartSnapshot.empty;
     }
   }
 
-  /// Schedule a snapshot save with debouncing and serialization.
+  /// Persist snapshot to storage.
   void schedulePersist(String? userId, CartSnapshot snapshot) {
-    final coordinator = coordinatorFor(userId);
-    coordinator.schedule(() async {
-      await _writeDirect(userId, snapshot);
-    });
-  }
-
-  Future<void> _writeDirect(String? userId, CartSnapshot snapshot) async {
     final key = keyFor(userId);
-    final envelope = Envelope(
-      v: currentVersion,
-      savedAt: DateTime.now().toUtc(),
-      userId: userId,
-      data: snapshot.toJson(),
-    );
-    await store.write(key, envelope.encode());
+    store.write(key, jsonEncode(snapshot.toJson()));
   }
 
-  Future<void> _handleCorruptBlob(String key, String raw) async {
-    logger?.error('Corrupt cart data detected at $key');
-    if (kDebugMode) {
-      await store.write('$key.corrupt', raw);
-    }
-    await store.remove(key);
+  Future<void> wipeUser(String userId) async {
+    await store.remove(keyFor(userId));
   }
 
   /// Merges guest cart into user cart on login and removes guest key.
@@ -313,7 +252,7 @@ class CartRepository implements UserScopedStore {
       return userSnapshot;
     }
 
-    final mergedLines = CartMergePolicy.mergeMaxQuantity(
+    final mergedLines = _mergeMaxQuantity(
       guestSnapshot.lines,
       userSnapshot.lines,
     );
@@ -327,15 +266,35 @@ class CartRepository implements UserScopedStore {
       lastSyncedAt: userSnapshot.lastSyncedAt,
     );
 
-    await _writeDirect(userId, mergedSnapshot);
+    schedulePersist(userId, mergedSnapshot);
     await store.remove(guestKey);
     return mergedSnapshot;
   }
 
-  @override
-  Future<void> wipeUser(String userId) async {
-    final key = keyFor(userId);
-    _coordinators[key]?.cancelAndDrop();
-    await store.remove(key);
+  static List<CartItem> _mergeMaxQuantity(
+    List<CartItem> localLines,
+    List<CartItem> serverLines, {
+    int maxQuantity = 10,
+  }) {
+    final Map<String, CartItem> merged = {};
+    for (final item in localLines) {
+      merged[item.id] = item;
+    }
+    for (final item in serverLines) {
+      if (merged.containsKey(item.id)) {
+        final existing = merged[item.id]!;
+        final newQty = min(max(existing.quantity, item.quantity), maxQuantity);
+        merged[item.id] = existing.copyWith(
+          quantity: newQty,
+          price: item.price,
+          requiresPrescription: item.requiresPrescription,
+        );
+      } else {
+        merged[item.id] = item.copyWith(
+          quantity: min(item.quantity, maxQuantity),
+        );
+      }
+    }
+    return merged.values.toList();
   }
 }

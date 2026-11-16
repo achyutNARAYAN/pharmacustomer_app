@@ -1,8 +1,6 @@
+import 'dart:convert';
 import 'dart:io';
-import '../../../core/storage/envelope.dart';
 import '../../../core/storage/key_value_store.dart';
-import '../../../core/storage/user_data_registry.dart';
-import '../../../core/storage/write_coordinator.dart';
 
 enum PrescriptionStatus {
   noneAttached,
@@ -126,32 +124,16 @@ class Prescription {
   }
 }
 
-class PrescriptionRepository implements UserScopedStore {
-  static const int currentVersion = 1;
+class PrescriptionRepository {
   final KeyValueStore store;
-  final UserDataRegistry userDataRegistry;
   final Directory? appSupportDir;
-
-  final Map<String, WriteCoordinator> _coordinators = {};
 
   PrescriptionRepository({
     required this.store,
-    required this.userDataRegistry,
     this.appSupportDir,
-  }) {
-    userDataRegistry.registerStore(this);
-  }
+  });
 
   String keyFor(String userId) => 'prescriptions.$userId';
-
-  WriteCoordinator coordinatorFor(String userId) {
-    final key = keyFor(userId);
-    return _coordinators.putIfAbsent(key, () {
-      final c = WriteCoordinator(key: key);
-      userDataRegistry.registerCoordinator(c);
-      return c;
-    });
-  }
 
   Future<List<Prescription>> hydrate(String userId) async {
     try {
@@ -159,10 +141,14 @@ class PrescriptionRepository implements UserScopedStore {
       final raw = await store.read(key);
       if (raw == null || raw.isEmpty) return [];
 
-      final envelope = Envelope.decode(raw);
-      if (envelope == null || envelope.userId != userId) return [];
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) return [];
 
-      final rawList = envelope.data['prescriptions'];
+      final data = decoded.containsKey('data') && decoded['data'] is Map<String, dynamic>
+          ? decoded['data'] as Map<String, dynamic>
+          : decoded;
+
+      final rawList = data['prescriptions'];
       if (rawList is! List) return [];
 
       final items = <Prescription>[];
@@ -179,26 +165,17 @@ class PrescriptionRepository implements UserScopedStore {
   }
 
   void schedulePersist(String userId, List<Prescription> items) {
-    final coordinator = coordinatorFor(userId);
-    coordinator.schedule(() async {
-      final key = keyFor(userId);
-      final envelope = Envelope(
-        v: currentVersion,
-        savedAt: DateTime.now().toUtc(),
-        userId: userId,
-        data: {
-          'prescriptions': items.map((p) => p.toJson()).toList(),
-        },
-      );
-      await store.write(key, envelope.encode());
-    });
+    final key = keyFor(userId);
+    store.write(
+      key,
+      jsonEncode({
+        'prescriptions': items.map((p) => p.toJson()).toList(),
+      }),
+    );
   }
 
-  @override
   Future<void> wipeUser(String userId) async {
-    final key = keyFor(userId);
-    _coordinators[key]?.cancelAndDrop();
-    await store.remove(key);
+    await store.remove(keyFor(userId));
 
     // Delete prescription files in rx_uploads if present
     if (appSupportDir != null) {

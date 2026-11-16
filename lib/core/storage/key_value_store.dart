@@ -4,8 +4,3 @@ abstract interface class KeyValueStore {
   Future<void> remove(String key);
   Future<Set<String>> keys({String? prefix});
 }
-
-abstract interface class UserScopedStore {
-  /// Remove everything held for [userId]: keys, files, caches.
-  Future<void> wipeUser(String userId);
-}

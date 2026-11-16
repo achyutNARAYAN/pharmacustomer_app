@@ -5,12 +5,10 @@ import '../repositories/patient_repository.dart';
 
 class PatientProfilesProvider extends ChangeNotifier {
   PatientProfilesProvider(this.repository) {
-    if (repository is ApiServicePatientRepository) {
-      final initial = (repository as ApiServicePatientRepository).cachedProfiles;
-      if (initial.isNotEmpty) {
-        profiles = initial;
-        loading = false;
-      }
+    final initial = repository.cachedProfiles;
+    if (initial.isNotEmpty) {
+      profiles = initial;
+      loading = false;
     }
   }
   final PatientRepository repository;

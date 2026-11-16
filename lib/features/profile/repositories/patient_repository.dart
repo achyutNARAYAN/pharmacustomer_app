@@ -2,6 +2,7 @@ import '../../../core/services/api_service.dart';
 import '../models/patient_profile.dart';
 
 abstract interface class PatientRepository {
+  List<PatientProfile> get cachedProfiles;
   Future<List<PatientProfile>> getProfiles();
   Future<void> addProfile(PatientProfile profile);
   Future<void> updateProfile(PatientProfile profile);
@@ -12,6 +13,7 @@ class ApiServicePatientRepository implements PatientRepository {
   final String selfName;
   final List<PatientProfile> _cachedProfiles = [];
 
+  @override
   List<PatientProfile> get cachedProfiles => List.unmodifiable(_cachedProfiles);
 
   ApiServicePatientRepository(this.selfName) {
