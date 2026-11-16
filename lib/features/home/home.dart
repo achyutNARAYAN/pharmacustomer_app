@@ -41,8 +41,8 @@ class _HomeState extends State<Home> {
     _fetchTrending();
   }
 
-  Future<void> _fetchTrending({int retryCount = 0}) async {
-    if (mounted) setState(() => _isLoadingTrending = true);
+  Future<void> _fetchTrending() async {
+    setState(() => _isLoadingTrending = true);
     try {
       final items = await ApiService.searchMedicines(limit: 20);
       if (mounted) {
@@ -51,13 +51,7 @@ class _HomeState extends State<Home> {
         });
       }
     } catch (_) {
-      // If the backend was cold-starting, auto-retry up to 2 times after a 2-second delay
-      if (mounted && retryCount < 2 && _trendingMedicines.isEmpty) {
-        await Future<void>.delayed(const Duration(seconds: 2));
-        if (mounted) {
-          return _fetchTrending(retryCount: retryCount + 1);
-        }
-      }
+      // Fallback gracefully if offline
     } finally {
       if (mounted) setState(() => _isLoadingTrending = false);
     }

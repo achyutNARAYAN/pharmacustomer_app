@@ -36,16 +36,6 @@ class PrescriptionVault extends StatefulWidget {
 class _PrescriptionVaultState extends State<PrescriptionVault> {
   int _tab = 0;
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        context.read<PrescriptionProvider?>()?.refresh();
-      }
-    });
-  }
-
   void _handleBack() {
     if (widget.onBack != null) {
       widget.onBack!();

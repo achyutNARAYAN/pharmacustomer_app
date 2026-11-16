@@ -482,13 +482,6 @@ class ApiService {
     return [];
   }
 
-  /// Pre-warms the remote server container (e.g. on Render.com free tier)
-  static Future<void> warmUp() async {
-    try {
-      await searchMedicines(limit: 1);
-    } catch (_) {}
-  }
-
   /// Get comprehensive details of a single medicine
   static Future<Map<String, dynamic>?> getMedicineById(String id) async {
     final res = await get(ApiConstants.medicineDetail(id));

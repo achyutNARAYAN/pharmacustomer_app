@@ -67,16 +67,6 @@ class _AddressManagementView extends StatefulWidget {
 class _AddressManagementViewState extends State<_AddressManagementView> {
   AddressType? _selectedFilter;
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        context.read<CustomerAddressProvider>().refresh();
-      }
-    });
-  }
-
   Future<void> _openAddAddress() async {
     final provider = context.read<CustomerAddressProvider>();
     final newAddress = await AddEditAddressSheet.show(

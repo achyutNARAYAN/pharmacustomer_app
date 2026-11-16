@@ -18,16 +18,6 @@ class _OrderHistoryState extends State<OrderHistory> {
   String filter = 'All';
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        context.read<OrdersProvider>().refresh();
-      }
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
     final ordersProvider = context.watch<OrdersProvider>();
     final orders = ordersProvider.orders;

@@ -6,9 +6,10 @@ import '../repositories/patient_repository.dart';
 class PatientProfilesProvider extends ChangeNotifier {
   PatientProfilesProvider(this.repository) {
     final initial = repository.cachedProfiles;
-    final hasRealMembers = initial.any((p) => !p.isSelf);
-    profiles = initial;
-    loading = !hasRealMembers;
+    if (initial.isNotEmpty) {
+      profiles = initial;
+      loading = false;
+    }
   }
   final PatientRepository repository;
   List<PatientProfile> profiles = const [];
@@ -29,7 +30,7 @@ class PatientProfilesProvider extends ChangeNotifier {
   }
 
   Future<void> refresh() async {
-    if (profiles.isEmpty || profiles.every((p) => p.isSelf)) {
+    if (profiles.isEmpty) {
       loading = true;
       _safeNotify();
     }
