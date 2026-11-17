@@ -1,9 +1,11 @@
 import 'dart:io';
 
+import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/theme.dart';
 import '../auth/providers/auth_provider.dart';
 import '../../core/providers/cart_notifier.dart';
 import '../../core/providers/profile_notifier.dart';
@@ -181,36 +183,30 @@ class _MainNavWrapperState extends State<MainNavWrapper> {
         ],
       ),
       bottomNavigationBar: Consumer2<CartNotifier, OrdersProvider>(
-        builder: (_, cart, orders, _) => BottomNavigationBar(
-          currentIndex: _currentIndex,
+        builder: (_, cart, orders, _) => CurvedNavigationBar(
+          index: _currentIndex,
+          height: 62.0,
+          color: AppTheme.primary,
+          buttonBackgroundColor: AppTheme.primary,
+          backgroundColor: AppTheme.background,
+          animationCurve: Curves.easeInOut,
+          animationDuration: const Duration(milliseconds: 300),
           onTap: (i) => setState(() => _currentIndex = i),
           items: [
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home),
-              label: 'Home',
+            const Icon(Icons.home_rounded, size: 28, color: Colors.white),
+            const Icon(Icons.search_rounded, size: 28, color: Colors.white),
+            _BadgedIcon(
+              icon: Icons.receipt_long_rounded,
+              count: orders.activeCount,
+              size: 28,
             ),
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.search),
-              label: 'Search',
-            ),
-            BottomNavigationBarItem(
-              icon: _BadgedIcon(
-                icon: Icons.receipt_long_outlined,
-                count: orders.activeCount,
-              ),
-              label: 'Orders',
-            ),
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.description_outlined),
-              label: 'Prescriptions',
-            ),
-            BottomNavigationBarItem(
-              icon: profile.profileImagePath == null
-                  ? const Icon(Icons.person_outline)
-                  : CircleAvatar(radius: 12, backgroundImage: FileImage(File(profile.profileImagePath!))),
-              label: 'Profile',
-            ),
+            const Icon(Icons.description_rounded, size: 28, color: Colors.white),
+            profile.profileImagePath == null
+                ? const Icon(Icons.person_rounded, size: 28, color: Colors.white)
+                : CircleAvatar(
+                    radius: 14,
+                    backgroundImage: FileImage(File(profile.profileImagePath!)),
+                  ),
           ],
         ),
       ),
@@ -223,15 +219,21 @@ class _MainNavWrapperState extends State<MainNavWrapper> {
 class _BadgedIcon extends StatelessWidget {
   final IconData icon;
   final int count;
-  const _BadgedIcon({required this.icon, required this.count});
+  final double size;
+
+  const _BadgedIcon({
+    required this.icon,
+    required this.count,
+    this.size = 28,
+  });
 
   @override
   Widget build(BuildContext context) {
-    if (count == 0) return Icon(icon);
+    if (count == 0) return Icon(icon, color: Colors.white, size: size);
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        Icon(icon),
+        Icon(icon, color: Colors.white, size: size),
         Positioned(
           right: -6,
           top: -4,
