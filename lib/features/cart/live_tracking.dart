@@ -97,9 +97,7 @@ class _LiveTrackingState extends State<LiveTracking> {
       if (apiAddresses.isNotEmpty) {
         // If customer previously selected an address, see if it matches in the API list
         Map<String, dynamic>? targetApiAddr;
-        if (activeAddress != null &&
-            activeAddress.id.isNotEmpty &&
-            !activeAddress.id.startsWith('addr_home_default')) {
+        if (activeAddress != null && activeAddress.id.isNotEmpty) {
           final selectedId = activeAddress.id;
           targetApiAddr = apiAddresses.firstWhere(
             (a) => a['_id'] == selectedId || a['id'] == selectedId,

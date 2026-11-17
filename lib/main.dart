@@ -120,8 +120,13 @@ class AppDependencies {
 
 class BootstrapGate extends StatefulWidget {
   final Future<AppDependencies> dependenciesFuture;
+  final AppDependencies? initialDeps;
 
-  const BootstrapGate({super.key, required this.dependenciesFuture});
+  const BootstrapGate({
+    super.key,
+    required this.dependenciesFuture,
+    this.initialDeps,
+  });
 
   @override
   State<BootstrapGate> createState() => _BootstrapGateState();
@@ -133,13 +138,16 @@ class _BootstrapGateState extends State<BootstrapGate> {
   @override
   void initState() {
     super.initState();
-    widget.dependenciesFuture.then((deps) {
-      if (mounted) {
-        setState(() {
-          _deps = deps;
-        });
-      }
-    });
+    _deps = widget.initialDeps;
+    if (_deps == null) {
+      widget.dependenciesFuture.then((deps) {
+        if (mounted) {
+          setState(() {
+            _deps = deps;
+          });
+        }
+      });
+    }
   }
 
   @override
@@ -192,11 +200,14 @@ class _BootstrapGateState extends State<BootstrapGate> {
   }
 }
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  final bootstrapFuture = AppDependencies.bootstrap();
+  final initialDeps = await bootstrapFuture;
   runApp(
     BootstrapGate(
-      dependenciesFuture: AppDependencies.bootstrap(),
+      dependenciesFuture: bootstrapFuture,
+      initialDeps: initialDeps,
     ),
   );
 }

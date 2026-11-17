@@ -66,10 +66,17 @@ class CartNotifier extends ChangeNotifier {
   /// All line items in cart. If remote cart is synchronized, returns mapped items;
   /// otherwise returns local cached items.
   List<CartItem> get items {
-    if (_remoteCart != null && _remoteCart!.items.isNotEmpty) {
+    if (_remoteCart != null) {
       return _remoteCart!.items;
     }
-    return _localItems.values.toList();
+    final seen = <String>{};
+    final unique = <CartItem>[];
+    for (final item in _localItems.values) {
+      if (seen.add(item.id)) {
+        unique.add(item);
+      }
+    }
+    return unique;
   }
 
   /// Total units in cart across all items.
@@ -77,7 +84,8 @@ class CartNotifier extends ChangeNotifier {
     if (_remoteCart != null) {
       return _remoteCart!.totalCount;
     }
-    return _localItems.values.fold(0, (sum, i) => sum + i.quantity);
+    final seen = <String>{};
+    return _localItems.values.where((i) => seen.add(i.id)).fold(0, (sum, i) => sum + i.quantity);
   }
 
   /// Total price payable in Rupees (Double for legacy UI widgets).
@@ -85,7 +93,8 @@ class CartNotifier extends ChangeNotifier {
     if (_remoteCart != null) {
       return _remoteCart!.totalPayableInRupees;
     }
-    return _localItems.values.fold(0.0, (sum, i) => sum + i.total);
+    final seen = <String>{};
+    return _localItems.values.where((i) => seen.add(i.id)).fold(0.0, (sum, i) => sum + i.total);
   }
 
   /// Returns quantity of an item by line item ID, medicine ID, or cached slug.
@@ -243,12 +252,18 @@ class CartNotifier extends ChangeNotifier {
       if (_inFlightSyncs.contains(key) || _debounceTimers.containsKey(key)) {
         return false;
       }
-      final mapped = _nameToObjectIdCache[key];
+      final cleanKey = key.startsWith('temp_') ? key.substring(5) : key;
+      final mapped = _nameToObjectIdCache[key] ?? _nameToObjectIdCache[cleanKey];
       CartLineItem? match;
       for (final i in baseCart.items) {
+        final iClean = i.id.startsWith('temp_') ? i.id.substring(5) : i.id;
         if (i.id == key ||
+            i.id == cleanKey ||
+            iClean == key ||
+            iClean == cleanKey ||
             i.medicineId == key ||
-            (mapped != null && (i.id == mapped || i.medicineId == mapped))) {
+            i.medicineId == cleanKey ||
+            (mapped != null && (i.id == mapped || iClean == mapped || i.medicineId == mapped))) {
           match = i;
           break;
         }
@@ -266,12 +281,19 @@ class CartNotifier extends ChangeNotifier {
     for (final entry in _pendingQuantities.entries) {
       final key = entry.key;
       final targetQty = entry.value;
-      final mapped = _nameToObjectIdCache[key];
+      final cleanKey = key.startsWith('temp_') ? key.substring(5) : key;
+      final mapped = _nameToObjectIdCache[key] ?? _nameToObjectIdCache[cleanKey];
 
-      final index = items.indexWhere((i) =>
-          i.id == key ||
-          i.medicineId == key ||
-          (mapped != null && (i.id == mapped || i.medicineId == mapped)));
+      final index = items.indexWhere((i) {
+        final iClean = i.id.startsWith('temp_') ? i.id.substring(5) : i.id;
+        return i.id == key ||
+            i.id == cleanKey ||
+            iClean == key ||
+            iClean == cleanKey ||
+            i.medicineId == key ||
+            i.medicineId == cleanKey ||
+            (mapped != null && (i.id == mapped || iClean == mapped || i.medicineId == mapped));
+      });
 
       if (index >= 0) {
         if (targetQty > 0) {
@@ -280,18 +302,23 @@ class CartNotifier extends ChangeNotifier {
           items.removeAt(index);
         }
       } else if (targetQty > 0) {
-        final fallback = _pendingFallbackItems[key];
-        final pricePaise = ((fallback?.price ?? 0) * 100).round();
-        items.add(CartLineItem(
-          id: 'temp_$key',
-          medicineId: _objectIdRegExp.hasMatch(key) ? key : (mapped ?? key),
-          name: fallback?.name ?? 'Medicine',
-          quantity: targetQty,
-          pricePaise: pricePaise,
-          mrpPaise: pricePaise,
-          isPrescriptionRequired: fallback?.requiresPrescription ?? false,
-          packSize: fallback?.pack ?? '',
-        ));
+        final fallback = _pendingFallbackItems[key] ??
+            _pendingFallbackItems[cleanKey] ??
+            _localItems[key] ??
+            _localItems[cleanKey];
+        if (fallback != null && fallback.name.trim().isNotEmpty && fallback.name != 'Medicine') {
+          final pricePaise = ((fallback.price) * 100).round();
+          items.add(CartLineItem(
+            id: 'temp_$cleanKey',
+            medicineId: _objectIdRegExp.hasMatch(cleanKey) ? cleanKey : (mapped ?? cleanKey),
+            name: fallback.name,
+            quantity: targetQty,
+            pricePaise: pricePaise,
+            mrpPaise: pricePaise,
+            isPrescriptionRequired: fallback.requiresPrescription,
+            packSize: fallback.pack,
+          ));
+        }
       }
     }
 
@@ -339,7 +366,10 @@ class CartNotifier extends ChangeNotifier {
     // Mirror to local cache for offline persistence
     _localItems.clear();
     for (final item in effectiveCart.items) {
-      _localItems[item.medicineId] = item.toCartItem();
+      _localItems[item.id] = item.toCartItem();
+      if (item.medicineId.isNotEmpty) {
+        _localItems[item.medicineId] = item.toCartItem();
+      }
     }
     _localPrescriptionIds.clear();
     if (effectiveCart.prescriptionId != null && effectiveCart.prescriptionId!.isNotEmpty) {
@@ -364,36 +394,66 @@ class CartNotifier extends ChangeNotifier {
   }
 
   void _applyOptimisticUpdate(String key, int newQuantity, {CartItem? fallback}) {
-    final mapped = _nameToObjectIdCache[key];
-    final resolvedMedicineId = _objectIdRegExp.hasMatch(key)
-        ? key
-        : (mapped ?? (fallback != null && _objectIdRegExp.hasMatch(fallback.id) ? fallback.id : key));
+    final cleanKey = key.startsWith('temp_') ? key.substring(5) : key;
+    final mapped = _nameToObjectIdCache[key] ?? _nameToObjectIdCache[cleanKey];
+    final resolvedMedicineId = _objectIdRegExp.hasMatch(cleanKey)
+        ? cleanKey
+        : (mapped ?? (fallback != null && _objectIdRegExp.hasMatch(fallback.id) ? fallback.id : cleanKey));
+
+    final effectiveFallback = fallback ??
+        _pendingFallbackItems[key] ??
+        _pendingFallbackItems[cleanKey] ??
+        _localItems[key] ??
+        _localItems[cleanKey];
 
     if (newQuantity > 0) {
-      if (fallback != null) {
-        _localItems[key] = fallback.copyWith(
+      if (effectiveFallback != null &&
+          effectiveFallback.name.trim().isNotEmpty &&
+          effectiveFallback.name != 'Medicine') {
+        final updated = effectiveFallback.copyWith(
           quantity: newQuantity,
           updatedAt: DateTime.now().toUtc(),
         );
+        _localItems[key] = updated;
+        _localItems[cleanKey] = updated;
       } else if (_localItems.containsKey(key)) {
         _localItems[key] = _localItems[key]!.copyWith(
+          quantity: newQuantity,
+          updatedAt: DateTime.now().toUtc(),
+        );
+      } else if (_localItems.containsKey(cleanKey)) {
+        _localItems[cleanKey] = _localItems[cleanKey]!.copyWith(
           quantity: newQuantity,
           updatedAt: DateTime.now().toUtc(),
         );
       }
     } else {
       _localItems.remove(key);
+      _localItems.remove(cleanKey);
       if (mapped != null) _localItems.remove(mapped);
+      _localItems.removeWhere((k, v) =>
+          v.id == key ||
+          v.id == cleanKey ||
+          (v is CartLineItem && (v.medicineId == key || v.medicineId == cleanKey)));
     }
 
     if (_remoteCart != null) {
       final items = List<CartLineItem>.from(_remoteCart!.items);
 
-      final index = items.indexWhere((i) =>
-          i.id == key ||
-          i.medicineId == key ||
-          i.medicineId == resolvedMedicineId ||
-          (mapped != null && (i.id == mapped || i.medicineId == mapped)));
+      final index = items.indexWhere((i) {
+        final iClean = i.id.startsWith('temp_') ? i.id.substring(5) : i.id;
+        return i.id == key ||
+            i.id == cleanKey ||
+            iClean == key ||
+            iClean == cleanKey ||
+            i.medicineId == key ||
+            i.medicineId == cleanKey ||
+            i.medicineId == resolvedMedicineId ||
+            (mapped != null &&
+                (i.id == mapped ||
+                    iClean == mapped ||
+                    i.medicineId == mapped));
+      });
 
       if (index >= 0) {
         if (newQuantity > 0) {
@@ -402,17 +462,33 @@ class CartNotifier extends ChangeNotifier {
           items.removeAt(index);
         }
       } else if (newQuantity > 0) {
-        final pricePaise = ((fallback?.price ?? 0) * 100).round();
-        items.add(CartLineItem(
-          id: 'temp_$key',
-          medicineId: resolvedMedicineId,
-          name: fallback?.name ?? 'Medicine',
-          quantity: newQuantity,
-          pricePaise: pricePaise,
-          mrpPaise: pricePaise,
-          isPrescriptionRequired: fallback?.requiresPrescription ?? false,
-          packSize: fallback?.pack ?? '',
-        ));
+        if (effectiveFallback != null &&
+            effectiveFallback.name.trim().isNotEmpty &&
+            effectiveFallback.name != 'Medicine') {
+          final pricePaise = ((effectiveFallback.price) * 100).round();
+          items.add(CartLineItem(
+            id: 'temp_$cleanKey',
+            medicineId: resolvedMedicineId,
+            name: effectiveFallback.name,
+            quantity: newQuantity,
+            pricePaise: pricePaise,
+            mrpPaise: pricePaise,
+            isPrescriptionRequired: effectiveFallback.requiresPrescription,
+            packSize: effectiveFallback.pack,
+          ));
+        } else if (fallback != null) {
+          final pricePaise = ((fallback.price) * 100).round();
+          items.add(CartLineItem(
+            id: 'temp_$cleanKey',
+            medicineId: resolvedMedicineId,
+            name: fallback.name.isNotEmpty ? fallback.name : 'Medicine',
+            quantity: newQuantity,
+            pricePaise: pricePaise,
+            mrpPaise: pricePaise,
+            isPrescriptionRequired: fallback.requiresPrescription,
+            packSize: fallback.pack,
+          ));
+        }
       }
 
       final itemsTotal = items.fold<int>(0, (sum, i) => sum + (i.pricePaise * i.quantity));
@@ -529,7 +605,7 @@ class CartNotifier extends ChangeNotifier {
             }
           }
 
-          if (_objectIdRegExp.hasMatch(resolvedId)) {
+          if (_objectIdRegExp.hasMatch(resolvedId) || (!resolvedId.contains('-') && !resolvedId.contains(' ') && !resolvedId.contains('_forte'))) {
             final updatedCart = await _repository.addRemoteItem(resolvedId, targetQty);
             if (updatedCart != null) {
               _applyRemoteCart(updatedCart);
@@ -599,13 +675,21 @@ class CartNotifier extends ChangeNotifier {
     final currentQty = quantityOf(key);
     final targetQty = (currentQty + quantity).clamp(1, 50);
 
-    _pendingQuantities[key] = targetQty;
-    if (localFallback != null) {
-      _pendingFallbackItems[key] = localFallback;
-    }
+    final cleanKey = key.startsWith('temp_') ? key.substring(5) : key;
+    final fallback = localFallback ??
+        _pendingFallbackItems[key] ??
+        _pendingFallbackItems[cleanKey] ??
+        _localItems[key] ??
+        _localItems[cleanKey] ??
+        CartItem(id: key, name: key, pack: '1 Unit', price: 0, quantity: targetQty);
 
-    _applyOptimisticUpdate(key, targetQty, fallback: localFallback);
-    _scheduleDebouncedSync(key, fallback: localFallback);
+    _pendingQuantities[key] = targetQty;
+    _pendingFallbackItems[key] = fallback;
+
+    _applyOptimisticUpdate(key, targetQty, fallback: fallback);
+    _debounceTimers[key]?.cancel();
+    _debounceTimers.remove(key);
+    await _executeSync(key);
   }
 
   /// 3. Update quantity of existing cart line item (lineItemId: _id, quantity: 1..50) with debouncing
@@ -841,7 +925,9 @@ class CartNotifier extends ChangeNotifier {
     final currentQty = quantityOf(key);
     if (currentQty >= 50) return;
 
-    final newQty = currentQty + 1;
+    final newQty = (currentQty == 0 && item.quantity > 1)
+        ? item.quantity.clamp(1, 50)
+        : (currentQty + 1).clamp(1, 50);
     _pendingQuantities[key] = newQty;
     _pendingFallbackItems[key] = item;
 
@@ -857,8 +943,18 @@ class CartNotifier extends ChangeNotifier {
     final newQty = currentQty - 1;
     _pendingQuantities[key] = newQty;
 
-    _applyOptimisticUpdate(key, newQty);
-    _scheduleDebouncedSync(key);
+    final cleanKey = key.startsWith('temp_') ? key.substring(5) : key;
+    final fallback = _pendingFallbackItems[key] ??
+        _pendingFallbackItems[cleanKey] ??
+        _localItems[key] ??
+        _localItems[cleanKey];
+
+    if (fallback != null) {
+      _pendingFallbackItems[key] = fallback;
+    }
+
+    _applyOptimisticUpdate(key, newQty, fallback: fallback);
+    _scheduleDebouncedSync(key, fallback: fallback);
   }
 
   void clear() {

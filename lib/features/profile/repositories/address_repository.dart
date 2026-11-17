@@ -20,72 +20,19 @@ class ApiServiceAddressRepository implements AddressRepository {
     if (initial != null && initial.isNotEmpty) {
       _cachedAddresses.addAll(initial);
     } else {
-      _initFromCacheOrDefault();
+      _initFromCache();
     }
   }
 
-  void _initFromCacheOrDefault() {
+  void _initFromCache() {
     final cached = ApiService.cachedCustomerProfile;
     if (cached != null) {
       final cust = (cached['customer'] is Map ? cached['customer'] : cached) as Map<String, dynamic>;
       final addresses = cust['addresses'];
       if (addresses is List && addresses.isNotEmpty) {
         _parseAndAppend(addresses);
-        return;
       }
     }
-
-    // Default starter addresses (HOME, WORK, OTHER) conforming to 5. Customer Address Management
-    _cachedAddresses.addAll([
-      const CustomerAddress(
-        id: 'addr_home_default',
-        addressType: AddressType.home,
-        addressLine1: 'Flat 402, Lotus Heights',
-        addressLine2: 'Road No. 12, Banjara Hills',
-        landmark: 'Near Care Hospital',
-        city: 'Hyderabad',
-        state: 'Telangana',
-        pinCode: '500034',
-        contactName: 'Achyut Joshi',
-        contactMobile: '9876543210',
-        isDefault: true,
-        latitude: 17.4156,
-        longitude: 78.4357,
-        eta: '22 Mins Express',
-      ),
-      const CustomerAddress(
-        id: 'addr_work_default',
-        addressType: AddressType.work,
-        addressLine1: 'Building 9, Mindspace IT Park',
-        addressLine2: 'HITEC City, Madhapur',
-        landmark: 'Opposite Inorbit Mall',
-        city: 'Hyderabad',
-        state: 'Telangana',
-        pinCode: '500081',
-        contactName: 'Achyut Joshi',
-        contactMobile: '9876543210',
-        isDefault: false,
-        latitude: 17.4385,
-        longitude: 78.3800,
-        eta: '28 Mins Express',
-      ),
-      const CustomerAddress(
-        id: 'addr_other_default',
-        addressType: AddressType.other,
-        addressLine1: 'House 18, Road No. 45',
-        addressLine2: 'Jubilee Hills',
-        landmark: 'Next to Apollo Clinic',
-        city: 'Hyderabad',
-        state: 'Telangana',
-        pinCode: '500033',
-        contactName: 'Dr. Ramesh Joshi',
-        contactMobile: '9848012345',
-        isDefault: false,
-        latitude: 17.4319,
-        longitude: 78.4073,
-        eta: '25 Mins Express',
-      ),
-    ]);
   }
 
   void _parseAndAppend(List<dynamic> remoteList) {

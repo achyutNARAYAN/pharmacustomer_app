@@ -36,54 +36,8 @@ class _AddressState extends State<Address> {
       final cust = (cached['customer'] is Map ? cached['customer'] : cached) as Map<String, dynamic>;
       if (cust['addresses'] is List && (cust['addresses'] as List).isNotEmpty) {
         _parseAndSetAddresses(cust['addresses'] as List);
-        return;
       }
     }
-    final profile = context.read<ProfileNotifier>();
-    final defaultHomeAddress = (profile.address.isNotEmpty && profile.address != 'Set delivery location')
-        ? profile.address
-        : 'Flat 402, Lotus Residency';
-    _addresses.addAll([
-      CustomerAddress(
-        id: 'addr_home',
-        addressType: AddressType.home,
-        addressLine1: defaultHomeAddress,
-        addressLine2: 'Road No. 12, Banjara Hills',
-        landmark: 'Near Care Hospital',
-        city: 'Hyderabad',
-        state: 'Telangana',
-        pinCode: '500034',
-        contactName: profile.name.isNotEmpty ? profile.name : 'Customer',
-        contactMobile: profile.phoneNumber.isNotEmpty ? profile.phoneNumber : '9876543210',
-        isDefault: true,
-      ),
-      CustomerAddress(
-        id: 'addr_work',
-        addressType: AddressType.work,
-        addressLine1: 'Building 9, Mindspace IT Park',
-        addressLine2: 'HITEC City, Madhapur',
-        landmark: 'Opposite Inorbit Mall',
-        city: 'Hyderabad',
-        state: 'Telangana',
-        pinCode: '500081',
-        contactName: profile.name.isNotEmpty ? profile.name : 'Customer',
-        contactMobile: profile.phoneNumber.isNotEmpty ? profile.phoneNumber : '9876543210',
-        isDefault: false,
-      ),
-      CustomerAddress(
-        id: 'addr_other',
-        addressType: AddressType.other,
-        addressLine1: 'House 18, Road No. 45',
-        addressLine2: 'Jubilee Hills',
-        landmark: 'Next to Apollo Clinic',
-        city: 'Hyderabad',
-        state: 'Telangana',
-        pinCode: '500033',
-        contactName: profile.name.isNotEmpty ? profile.name : 'Customer',
-        contactMobile: profile.phoneNumber.isNotEmpty ? profile.phoneNumber : '9876543210',
-        isDefault: false,
-      ),
-    ]);
   }
 
   void _parseAndSetAddresses(List remoteAddrs) {
