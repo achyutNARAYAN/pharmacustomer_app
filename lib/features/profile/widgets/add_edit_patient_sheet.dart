@@ -20,6 +20,39 @@ class _AddEditPatientSheet extends StatefulWidget {
 }
 
 class _AddEditPatientSheetState extends State<_AddEditPatientSheet> {
+  static const List<String> _genderOptions = [
+    'Female',
+    'Male',
+    'Other',
+    'Prefer not to say',
+  ];
+
+  static String? _normalizeGender(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return null;
+    final clean = raw.trim().toUpperCase();
+    switch (clean) {
+      case 'MALE':
+      case 'M':
+        return 'Male';
+      case 'FEMALE':
+      case 'F':
+        return 'Female';
+      case 'OTHER':
+      case 'O':
+        return 'Other';
+      case 'PREFER NOT TO SAY':
+      case 'PREFER_NOT_TO_SAY':
+        return 'Prefer not to say';
+      default:
+        for (final option in _genderOptions) {
+          if (option.toUpperCase() == clean) {
+            return option;
+          }
+        }
+        return null;
+    }
+  }
+
   late final _name = TextEditingController(text: widget.profile?.name);
   late final _custom = TextEditingController(
     text: widget.profile?.customRelationLabel,
@@ -28,9 +61,11 @@ class _AddEditPatientSheetState extends State<_AddEditPatientSheet> {
   late final _conditionOther = TextEditingController();
   late final _allergyOther = TextEditingController();
   late PatientRelation _relation =
-      widget.profile?.relation ?? PatientRelation.father;
+      (widget.profile?.relation == PatientRelation.self && widget.profile?.isSelf != true)
+          ? PatientRelation.father
+          : (widget.profile?.relation ?? PatientRelation.father);
   late DateTime? _dob = widget.profile?.dob;
-  late String _gender = widget.profile?.gender ?? '';
+  late String? _gender = _normalizeGender(widget.profile?.gender);
   late final _conditions = [...?widget.profile?.chronicConditions];
   late final _allergies = [...?widget.profile?.allergies];
   String? _error;
@@ -112,7 +147,11 @@ class _AddEditPatientSheetState extends State<_AddEditPatientSheet> {
                       )
                     else
                       DropdownButtonFormField<PatientRelation>(
-                        initialValue: _relation,
+                        value: PatientRelation.values
+                                .where((e) => e != PatientRelation.self)
+                                .contains(_relation)
+                            ? _relation
+                            : null,
                         decoration: const InputDecoration(
                           labelText: 'Relation *',
                         ),
@@ -172,18 +211,17 @@ class _AddEditPatientSheetState extends State<_AddEditPatientSheet> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      initialValue: _gender.isEmpty ? null : _gender,
+                      value: _genderOptions.contains(_gender) ? _gender : null,
                       decoration: const InputDecoration(
                         labelText: 'Gender (optional)',
                       ),
-                      items:
-                          const ['Female', 'Male', 'Other', 'Prefer not to say']
-                              .map(
-                                (e) =>
-                                    DropdownMenuItem(value: e, child: Text(e)),
-                              )
-                              .toList(),
-                      onChanged: (v) => setState(() => _gender = v ?? ''),
+                      items: _genderOptions
+                          .map(
+                            (e) =>
+                                DropdownMenuItem(value: e, child: Text(e)),
+                          )
+                          .toList(),
+                      onChanged: (v) => setState(() => _gender = v),
                     ),
                     const SizedBox(height: 16),
                     _sectionLabel('Health & safety'),
@@ -397,7 +435,7 @@ class _AddEditPatientSheetState extends State<_AddEditPatientSheet> {
         relation: old?.isSelf == true ? PatientRelation.self : _relation,
         customRelationLabel: _custom.text.trim(),
         dob: _dob,
-        gender: _gender,
+        gender: _gender ?? '',
         phoneNumber: _phone.text.trim(),
         chronicConditions: List.of(_conditions),
         allergies: List.of(_allergies),

@@ -47,13 +47,24 @@ class ApiServicePatientRepository implements PatientRepository {
               id: id.isNotEmpty ? id : DateTime.now().microsecondsSinceEpoch.toString(),
               name: name,
               relation: _parseRelation(m['relationship'] as String?),
-              gender: m['gender'] as String? ?? '',
+              gender: _parseGender(m['gender'] as String?),
               lastUpdated: DateTime.now(),
             ),
           );
         }
       }
     }
+  }
+
+  String _parseGender(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return '';
+    return switch (raw.trim().toUpperCase()) {
+      'MALE' || 'M' => 'Male',
+      'FEMALE' || 'F' => 'Female',
+      'OTHER' || 'O' => 'Other',
+      'PREFER_NOT_TO_SAY' || 'PREFER NOT TO SAY' => 'Prefer not to say',
+      _ => raw.trim(),
+    };
   }
 
   @override
