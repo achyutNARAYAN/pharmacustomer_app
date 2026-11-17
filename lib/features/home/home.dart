@@ -2,12 +2,15 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/theme.dart';
 import '../../core/models/medicine_model.dart';
+import '../../core/providers/cart_notifier.dart';
 import '../../core/services/api_service.dart';
 import 'search.dart';
 import '../cart/address.dart';
+import '../cart/cart.dart';
 import '../medicine/medicine_detail.dart';
 import 'widgets/condition_item.dart';
 import 'widgets/prescription_banner.dart';
@@ -39,6 +42,18 @@ class _HomeState extends State<Home> {
   void initState() {
     super.initState();
     _fetchTrending();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<CartNotifier>().refresh();
+      }
+    });
+  }
+
+  Future<void> _handleRefresh() async {
+    await Future.wait([
+      _fetchTrending(),
+      context.read<CartNotifier>().refresh(),
+    ]);
   }
 
   Future<void> _fetchTrending() async {
@@ -71,7 +86,7 @@ class _HomeState extends State<Home> {
       backgroundColor: AppTheme.background,
       appBar: _buildAppBar(),
       body: RefreshIndicator(
-        onRefresh: _fetchTrending,
+        onRefresh: _handleRefresh,
         color: AppTheme.primary,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -123,6 +138,43 @@ class _HomeState extends State<Home> {
         ],
       ),
       actions: [
+        Consumer<CartNotifier>(
+          builder: (context, cart, _) => Stack(
+            clipBehavior: Clip.none,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.shopping_bag_outlined),
+                tooltip: 'Cart',
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(builder: (_) => const Cart()),
+                ),
+              ),
+              if (cart.totalCount > 0)
+                Positioned(
+                  right: 6,
+                  top: 6,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: AppTheme.primary,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                    child: Text(
+                      '${cart.totalCount}',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
         Stack(
           children: [
             IconButton(

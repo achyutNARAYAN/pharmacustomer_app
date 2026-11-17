@@ -312,6 +312,22 @@ class CartNotifier extends ChangeNotifier {
     if (_pendingQuantities.isNotEmpty) {
       effectiveCart = _overlayPendingQuantities(cart);
     }
+
+    // A cart converted to an order or abandoned is no longer an active customer cart
+    final cartStatus = effectiveCart.status.toUpperCase();
+    if (cartStatus == 'ORDER_PLACED' || cartStatus == 'ABANDONED') {
+      _localItems.clear();
+      _localPrescriptionIds.clear();
+      _remoteCart = null;
+      _summary = const CartSummary();
+      _warnings = const [];
+      _stockHoldTimer?.cancel();
+      _remainingHoldSeconds = 0;
+      _schedulePersist();
+      _safeNotify();
+      return;
+    }
+
     _remoteCart = effectiveCart;
     if (summary != null) _summary = summary;
     if (warnings != null) _warnings = warnings;
@@ -331,7 +347,13 @@ class CartNotifier extends ChangeNotifier {
     }
 
     if (effectiveCart.isLocked && effectiveCart.expiresAt != null) {
-      _startHoldTimer(effectiveCart.expiresAt!);
+      final isExpired = effectiveCart.expiresAt!.isBefore(DateTime.now().toUtc());
+      if (isExpired) {
+        _stockHoldTimer?.cancel();
+        _remainingHoldSeconds = 0;
+      } else {
+        _startHoldTimer(effectiveCart.expiresAt!);
+      }
     } else {
       _stockHoldTimer?.cancel();
       _remainingHoldSeconds = 0;
@@ -479,17 +501,28 @@ class CartNotifier extends ChangeNotifier {
               resolvedId = cached;
             } else {
               try {
-                final query = (fallback?.name ?? key).replaceAll('_', ' ').split(' ').first;
+                final targetName = (fallback?.name ?? key).trim().toLowerCase();
+                final query = targetName.replaceAll('_', ' ').split(' ').first;
                 final matches = await ApiService.searchMedicines(search: query);
                 for (final m in matches) {
-                  final candidate = m['_id'] as String? ?? m['id'] as String?;
+                  final rawCand = m['_id'] ?? m['id'] ?? m['medicineId'];
+                  final candidate = (rawCand is Map)
+                      ? (rawCand[r'$oid'] ?? rawCand['_id'] ?? rawCand['id'])?.toString()
+                      : rawCand?.toString();
+                  final candName = (m['name'] as String? ?? '').trim().toLowerCase();
                   if (candidate != null && _objectIdRegExp.hasMatch(candidate)) {
-                    resolvedId = candidate;
-                    _nameToObjectIdCache[key] = candidate;
-                    if (fallback?.name != null) {
-                      _nameToObjectIdCache[fallback!.name] = candidate;
+                    final isNameMatch = candName == targetName ||
+                        (candName.isNotEmpty &&
+                            targetName.isNotEmpty &&
+                            (candName.contains(query) || targetName.contains(candName)));
+                    if (isNameMatch) {
+                      resolvedId = candidate;
+                      _nameToObjectIdCache[key] = candidate;
+                      if (fallback?.name != null) {
+                        _nameToObjectIdCache[fallback!.name] = candidate;
+                      }
+                      break;
                     }
-                    break;
                   }
                 }
               } catch (_) {}

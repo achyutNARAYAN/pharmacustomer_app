@@ -30,7 +30,7 @@ class TrendingCard extends StatelessWidget {
     return double.tryParse(cleaned) ?? 0;
   }
 
-  String get _cartId => id ?? title.toLowerCase().replaceAll(' ', '_');
+  String get _cartId => (id != null && id!.trim().isNotEmpty) ? id!.trim() : title.toLowerCase().replaceAll(' ', '_');
 
   @override
   Widget build(BuildContext context) {

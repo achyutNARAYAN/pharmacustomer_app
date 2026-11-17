@@ -39,7 +39,7 @@ class MedicineListCard extends StatelessWidget {
     return double.tryParse(cleaned) ?? 0;
   }
 
-  String get _cartId => id ?? name.toLowerCase().replaceAll(' ', '_');
+  String get _cartId => (id != null && id!.trim().isNotEmpty) ? id!.trim() : name.toLowerCase().replaceAll(' ', '_');
 
   @override
   Widget build(BuildContext context) {

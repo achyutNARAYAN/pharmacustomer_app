@@ -60,8 +60,13 @@ class Medicine {
         ? descParts.join(' • ')
         : (json['description']?.toString() ?? '');
 
+    final rawId = json['_id'] ?? json['id'] ?? json['medicineId'];
+    final parsedId = (rawId is Map)
+        ? (rawId[r'$oid'] ?? rawId['_id'] ?? rawId['id'])
+        : rawId;
+
     return Medicine(
-      id: (json['_id'] ?? json['id'])?.toString(),
+      id: parsedId?.toString(),
       medicineCode: json['medicineCode']?.toString(),
       name: json['name']?.toString() ?? '',
       description: desc,

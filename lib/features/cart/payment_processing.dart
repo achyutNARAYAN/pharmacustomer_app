@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/models/cart_item.dart';
 import '../../core/providers/cart_notifier.dart';
 import '../../core/theme.dart';
 import '../orders/providers/orders_provider.dart';
@@ -32,23 +33,35 @@ class _PaymentProcessingState extends State<PaymentProcessing> {
       final cart = context.read<CartNotifier>();
       final ordersProvider = context.read<OrdersProvider?>();
 
-      // Record in OrdersProvider if available
+      // 1. Snapshot the confirmed order details
+      final orderedItems = List<CartItem>.from(cart.items);
+      final totalPaid = widget.amount;
+      final totalCount = cart.totalCount > 0 ? cart.totalCount : orderedItems.length;
+
+      // 2. Record in OrdersProvider
       final orderId = 'AC-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
       ordersProvider?.addOrder(
         OrderItem(
           orderId: orderId,
           status: OrderStatus.placed,
-          totalPaise: (widget.amount * 100).round(),
-          itemCount: cart.totalCount > 0 ? cart.totalCount : 1,
+          totalPaise: (totalPaid * 100).round(),
+          itemCount: totalCount,
           createdAt: DateTime.now(),
         ),
       );
 
-      // Auto-transition to Order Placed confirmation
+      // 3. Atomically clear the active cart (remote API DELETE + local persistence wipe)
+      cart.clearAll();
+
+      // 4. Auto-transition to Order Placed confirmation with the confirmed snapshot
       Navigator.pushReplacement(
         context,
         MaterialPageRoute<void>(
-          builder: (_) => const OrderPlaced(),
+          builder: (_) => OrderPlaced(
+            orderedItems: orderedItems,
+            totalPaid: totalPaid,
+            totalCount: totalCount,
+          ),
         ),
       );
     });

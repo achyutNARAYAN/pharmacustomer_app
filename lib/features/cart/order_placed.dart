@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/models/cart_item.dart';
 import '../../core/providers/cart_notifier.dart';
 import '../../core/providers/profile_notifier.dart';
 import '../../core/theme.dart';
@@ -8,7 +9,16 @@ import 'tax_invoice.dart';
 import 'live_tracking.dart';
 
 class OrderPlaced extends StatelessWidget {
-  const OrderPlaced({super.key});
+  final List<CartItem>? orderedItems;
+  final double? totalPaid;
+  final int? totalCount;
+
+  const OrderPlaced({
+    super.key,
+    this.orderedItems,
+    this.totalPaid,
+    this.totalCount,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -17,6 +27,10 @@ class OrderPlaced extends StatelessWidget {
     final deliveryAddress = profile.address.isNotEmpty
         ? profile.address
         : 'Primary Delivery Location';
+
+    final items = orderedItems ?? cart.items;
+    final count = totalCount ?? (orderedItems != null ? orderedItems!.fold<int>(0, (sum, i) => sum + i.quantity) : cart.totalCount);
+    final paid = totalPaid ?? cart.totalPrice;
     return Scaffold(
       appBar: AppBar(
         title: const Column(
@@ -98,14 +112,14 @@ class OrderPlaced extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${cart.totalCount} Medicines Ordered',
+                  '$count Medicines Ordered',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const Divider(height: 20),
-                ...cart.items.map(
+                ...items.map(
                   (item) => ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(
@@ -119,7 +133,7 @@ class OrderPlaced extends StatelessWidget {
                 ),
                 const Divider(),
                 Text(
-                  'Total paid  ₹${cart.totalPrice.toStringAsFixed(0)}',
+                  'Total paid  ₹${paid.toStringAsFixed(0)}',
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     color: AppTheme.primaryDark,
