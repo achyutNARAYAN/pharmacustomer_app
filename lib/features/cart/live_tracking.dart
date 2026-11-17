@@ -135,10 +135,6 @@ class _LiveTrackingState extends State<LiveTracking> {
     final fallbackItems = cart.items.map((i) => i.name).toList();
 
     Map<String, dynamic>? backendData;
-    if (activeOrderId != null && activeOrderId.isNotEmpty) {
-      backendData = await ApiService.getDeliveryTracking(activeOrderId);
-    }
-
     if (!mounted) return;
 
     // Resolve true real-world coordinates for the delivery address

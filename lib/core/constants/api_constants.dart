@@ -36,5 +36,4 @@ abstract final class ApiConstants {
   // ── Orders & Payments ────────────────────────────────────────────────────────
   static const String orders = '/orders';
   static const String initiatePayment = '/payments/initiate';
-  static String deliveryTracking(String orderId) => '/delivery/$orderId/tracking';
 }

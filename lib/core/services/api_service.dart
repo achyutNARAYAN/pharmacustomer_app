@@ -619,19 +619,10 @@ class ApiService {
     return await delete(ApiConstants.customerAddressDetail(targetId, addressId));
   }
 
-  /// Get all saved delivery addresses for a customer
+  /// Get all saved delivery addresses for a customer (extracted from customer profile)
   static Future<List<Map<String, dynamic>>> getAddresses([String? customerId]) async {
     final targetId = _resolveCustomerId(customerId);
     if (targetId.isNotEmpty) {
-      try {
-        final res = await get(ApiConstants.customerAddresses(targetId));
-        if (res is List) {
-          return res.whereType<Map<String, dynamic>>().toList();
-        } else if (res is Map && res['addresses'] is List) {
-          return (res['addresses'] as List).whereType<Map<String, dynamic>>().toList();
-        }
-      } catch (_) {}
-
       try {
         final profile = await getCustomerProfile(targetId);
         if (profile != null) {
@@ -846,21 +837,5 @@ class ApiService {
       body['couponCode'] = couponCode.trim().toUpperCase();
     }
     return await post(ApiConstants.cartCheckout, body: body);
-  }
-
-  /// 12. Fetch real-time delivery tracking for an order
-  static Future<Map<String, dynamic>?> getDeliveryTracking(String orderId) async {
-    try {
-      final res = await get(ApiConstants.deliveryTracking(orderId));
-      if (res is Map<String, dynamic>) {
-        if (res['data'] is Map<String, dynamic>) {
-          return res['data'] as Map<String, dynamic>;
-        }
-        return res;
-      }
-      return null;
-    } catch (_) {
-      return null;
-    }
   }
 }
