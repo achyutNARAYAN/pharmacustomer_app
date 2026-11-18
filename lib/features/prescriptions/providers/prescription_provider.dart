@@ -41,6 +41,49 @@ class PrescriptionProvider extends ChangeNotifier {
     _safeNotify();
   }
 
+  Future<bool> deletePrescription(String prescriptionId) async {
+    _prescriptions.removeWhere((p) => p.id == prescriptionId);
+    if (_repository != null && _userId != null) {
+      _repository.schedulePersist(_userId!, _prescriptions);
+    }
+    _safeNotify();
+
+    if (ApiService.token != null) {
+      try {
+        await ApiService.deletePrescription(prescriptionId);
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  void archivePrescription(String prescriptionId) {
+    final index = _prescriptions.indexWhere((p) => p.id == prescriptionId);
+    if (index != -1) {
+      final old = _prescriptions[index];
+      _prescriptions[index] = Prescription(
+        id: old.id,
+        localId: old.localId,
+        source: old.source,
+        status: PrescriptionStatus.expired,
+        fileName: old.fileName,
+        mime: old.mime,
+        sizeBytes: old.sizeBytes,
+        remoteUrl: old.remoteUrl,
+        rejectionReason: old.rejectionReason,
+        doctorName: old.doctorName,
+        createdAt: old.createdAt,
+        updatedAt: DateTime.now(),
+      );
+      if (_repository != null && _userId != null) {
+        _repository.schedulePersist(_userId!, _prescriptions);
+      }
+      _safeNotify();
+    }
+  }
+
   Future<void> init() async {
     if (_repository == null || _userId == null) {
       _status = LoadStatus.ready;
@@ -60,7 +103,14 @@ class PrescriptionProvider extends ChangeNotifier {
         final remoteItems = await ApiService.listPrescriptions(customerId: _userId);
         if (remoteItems.isNotEmpty) {
           for (final item in remoteItems) {
-            final rxId = item['prescriptionId'] as String? ?? item['_id'] as String? ?? '';
+            final rxId = (item['prescriptionId'] ??
+                    item['_id'] ??
+                    item['id'] ??
+                    item['rxId'] ??
+                    '')
+                .toString();
+            if (rxId.isEmpty) continue;
+
             final statusStr = (item['status'] as String? ?? '').toUpperCase();
             final status = switch (statusStr) {
               'APPROVED' => PrescriptionStatus.approved,
@@ -69,7 +119,16 @@ class PrescriptionProvider extends ChangeNotifier {
               'PENDING_REVIEW' => PrescriptionStatus.underReview,
               _ => PrescriptionStatus.uploaded,
             };
-            if (!_prescriptions.any((p) => p.id == rxId)) {
+
+            final existingIndex = _prescriptions.indexWhere((p) => p.id == rxId);
+            if (existingIndex >= 0) {
+              _prescriptions[existingIndex] = _prescriptions[existingIndex].copyWith(
+                status: status,
+                remoteUrl: item['documentUrl'] as String? ?? _prescriptions[existingIndex].remoteUrl,
+                doctorName: item['doctorName'] as String? ?? _prescriptions[existingIndex].doctorName,
+                updatedAt: DateTime.now(),
+              );
+            } else {
               _prescriptions.add(
                 Prescription(
                   id: rxId,

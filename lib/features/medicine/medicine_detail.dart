@@ -4,9 +4,13 @@ import 'package:provider/provider.dart';
 import '../../core/models/cart_item.dart';
 import '../../core/models/medicine_model.dart';
 import '../../core/providers/cart_notifier.dart';
+import '../../core/providers/profile_notifier.dart';
 import '../../core/services/api_service.dart';
 import '../../core/theme.dart';
+import '../prescriptions/prescription_review.dart';
 import '../prescriptions/prescription_upload_sheet.dart';
+import '../prescriptions/providers/prescription_provider.dart';
+import '../prescriptions/repositories/prescription_repository.dart';
 import 'widgets/clinical_instructions_card.dart';
 import 'widgets/delivery_banner.dart';
 import 'widgets/medicine_hero_card.dart';
@@ -126,9 +130,25 @@ class _MedicineDetailState extends State<MedicineDetail> {
                     padding: const EdgeInsets.only(left: 16),
                     child: ElevatedButton.icon(
                       onPressed: () async {
+                        final nav = Navigator.of(context);
+                        final profile = context.read<ProfileNotifier?>();
+                        final pName = (profile?.name.isNotEmpty ?? false) ? profile!.name : 'Customer';
+                        final cart = context.read<CartNotifier>();
+
                         final file = await showPrescriptionUploadSheet(context);
                         if (file != null && mounted) {
-                          setState(() => _isPrescriptionUploaded = true);
+                          final uploadedRx = await nav.push<Prescription?>(
+                            MaterialPageRoute<Prescription?>(
+                              builder: (_) => PrescriptionReview(
+                                file: file,
+                                patientName: pName,
+                              ),
+                            ),
+                          );
+                          if (uploadedRx != null && mounted) {
+                            setState(() => _isPrescriptionUploaded = true);
+                            cart.attachPrescriptionId(uploadedRx.id);
+                          }
                         }
                       },
                       icon: const Icon(Icons.upload_file, size: 16),
@@ -180,6 +200,17 @@ class _MedicineDetailState extends State<MedicineDetail> {
                         requiresPrescription: _medicine.requiresPrescription,
                       );
                       cart.addMedicine(cartId, quantity: _quantity, localFallback: item);
+
+                      if (_medicine.requiresPrescription && !cart.hasPrescriptionAttached) {
+                        final rxProv = context.read<PrescriptionProvider?>();
+                        final approved = rxProv?.prescriptions
+                            .where((p) => p.status == PrescriptionStatus.approved)
+                            .toList();
+                        if (approved != null && approved.isNotEmpty) {
+                          cart.attachPrescriptionId(approved.first.id);
+                        }
+                      }
+
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text('$_quantity × ${_medicine.name} added to cart'),

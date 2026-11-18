@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/providers/cart_notifier.dart';
 import '../../core/services/api_service.dart';
 import '../../core/theme.dart';
 import '../auth/providers/auth_provider.dart';
@@ -162,6 +163,7 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
         (p) => Padding(
           padding: const EdgeInsets.only(bottom: 14),
           child: _prescriptionCard(
+            rxId: p.id,
             name: p.doctorName ?? 'Consulting Physician',
             subtitle: 'Prescription #${p.id.length > 8 ? p.id.substring(0, 8) : p.id}',
             date: 'Added ${_formatDate(p.createdAt)}',
@@ -274,8 +276,8 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
   Future<void> _uploadPrescription() async {
     final file = await showPrescriptionUploadSheet(context);
     if (!mounted || file == null) return;
-    final submitted = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
+    final uploadedRx = await Navigator.of(context).push<Prescription?>(
+      MaterialPageRoute<Prescription?>(
         builder: (_) => PrescriptionReview(
           file: file,
           patientName: widget.patientName,
@@ -285,43 +287,7 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
         ),
       ),
     );
-    if (submitted == true && mounted) {
-      String rxId = 'rx_${DateTime.now().millisecondsSinceEpoch}';
-      try {
-        if (ApiService.token != null) {
-          final effectiveCustomerId = ApiService.currentCustomerId ??
-              (mounted ? context.read<AuthProvider?>()?.userId : null);
-          final res = await ApiService.uploadPrescription(
-            customerId: effectiveCustomerId,
-            patientName: widget.patientName.isNotEmpty ? widget.patientName : 'Customer',
-            prescriptionDate: DateTime.now(),
-            documentUrl: file.path ?? 'https://res.cloudinary.com/demo/sample_rx.pdf',
-            fileSize: file.size,
-            mimeType: file.extension == 'pdf' ? 'application/pdf' : 'image/jpeg',
-          );
-          if (res != null && res['prescriptionId'] != null) {
-            rxId = res['prescriptionId'] as String;
-          }
-        }
-      } catch (_) {}
-
-      if (!mounted) return;
-      final rxProvider = context.read<PrescriptionProvider?>();
-      if (rxProvider != null) {
-        rxProvider.addPrescription(
-          Prescription(
-            id: rxId,
-            source: 'upload',
-            status: PrescriptionStatus.underReview,
-            fileName: file.name,
-            mime: file.extension ?? 'image/jpeg',
-            sizeBytes: file.size,
-            remoteUrl: file.path,
-            createdAt: DateTime.now(),
-            updatedAt: DateTime.now(),
-          ),
-        );
-      }
+    if (uploadedRx != null && mounted) {
       setState(() {
         _tab = 1;
       });
@@ -334,6 +300,7 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
     required String date,
     required String status,
     required List<(String, String)> medicines,
+    String? rxId,
   }) => Container(
     padding: const EdgeInsets.all(16),
     decoration: _cardDecoration(),
@@ -454,7 +421,7 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: _showDocument,
+                onPressed: () => _showDocument(rxId),
                 icon: const Icon(Icons.visibility_outlined, size: 17),
                 label: const Text('View Rx'),
               ),
@@ -583,6 +550,7 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
               p.fileName,
               'Archived prescription record',
               Colors.orange,
+              rxId: p.id,
             ),
           ),
         ),
@@ -597,6 +565,7 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
     String medicine,
     String detail,
     Color color, {
+    String? rxId,
     bool first = false,
   }) => Container(
     padding: const EdgeInsets.all(18),
@@ -733,7 +702,7 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
                 children: [
                   Expanded(
                     child: TextButton.icon(
-                      onPressed: _showDocument,
+                      onPressed: () => _showDocument(rxId),
                       icon: const Icon(Icons.visibility_outlined, size: 18),
                       label: const Text('View document'),
                     ),
@@ -756,7 +725,7 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: _showDocument,
+                  onPressed: () => _showDocument(rxId),
                   icon: const Icon(Icons.visibility_outlined, size: 16),
                   label: const Text('View document'),
                 ),
@@ -993,9 +962,44 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
   void _showDocument([String? rxId]) => showPrescriptionDetailSheet(
     context,
     prescriptionId: rxId,
-    onArchive: () => setState(() {
-      _tab = 2;
-    }),
+    onArchive: () {
+      if (rxId != null) {
+        context.read<PrescriptionProvider?>()?.archivePrescription(rxId);
+      }
+      setState(() {
+        _tab = 2;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Prescription moved to Past & Expired.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    },
+    onDelete: () async {
+      if (rxId != null) {
+        await context.read<PrescriptionProvider?>()?.deletePrescription(rxId);
+        if (!mounted) return;
+        final cart = context.read<CartNotifier?>();
+        if (cart?.prescriptionId == rxId) {
+          cart?.removePrescriptionId();
+        }
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.delete_sweep_rounded, color: Colors.white, size: 20),
+              SizedBox(width: 8),
+              Expanded(child: Text('Prescription deleted permanently.')),
+            ],
+          ),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    },
   );
 
   void _showRefillSheet() => showPrescriptionRefillSheet(context);

@@ -91,55 +91,15 @@ class _MainNavWrapperState extends State<MainNavWrapper> {
   Future<void> _reviewHomePrescription(PlatformFile file) async {
     final patientName = context.read<ProfileNotifier>().name;
     final pName = patientName.isNotEmpty ? patientName : 'Customer';
-    final submitted = await Navigator.of(context).push<bool>(MaterialPageRoute(
+    final uploadedRx = await Navigator.of(context).push<Prescription?>(MaterialPageRoute(
       builder: (_) => PrescriptionReview(
         file: file,
         patientName: pName,
       ),
     ));
 
-    if (submitted == true && mounted) {
-      String rxId = 'rx_${DateTime.now().millisecondsSinceEpoch}';
-      try {
-        if (ApiService.token != null) {
-          final effectiveCustomerId = ApiService.currentCustomerId ??
-              (mounted ? context.read<AuthProvider?>()?.userId : null);
-          final res = await ApiService.uploadPrescription(
-            customerId: effectiveCustomerId,
-            patientName: pName,
-            prescriptionDate: DateTime.now(),
-            documentUrl: file.path ?? 'https://res.cloudinary.com/demo/sample_rx.pdf',
-            fileSize: file.size,
-            mimeType: file.extension == 'pdf' ? 'application/pdf' : 'image/jpeg',
-          );
-          if (res != null) {
-            final doc = res['prescription'] ?? res['data'] ?? res;
-            if (doc is Map && doc['_id'] != null) {
-              rxId = doc['_id'].toString();
-            } else if (res['_id'] != null) {
-              rxId = res['_id'].toString();
-            }
-          }
-        }
-      } catch (_) {}
-
-      if (mounted) {
-        final rxProvider = context.read<PrescriptionProvider?>();
-        rxProvider?.addPrescription(
-          Prescription(
-            id: rxId,
-            source: 'upload',
-            status: PrescriptionStatus.approved,
-            fileName: file.name,
-            mime: file.extension ?? 'image/jpeg',
-            sizeBytes: file.size,
-            remoteUrl: file.path,
-            createdAt: DateTime.now(),
-            updatedAt: DateTime.now(),
-          ),
-        );
-        setState(() => _currentIndex = 3);
-      }
+    if (uploadedRx != null && mounted) {
+      setState(() => _currentIndex = 3);
     }
   }
 

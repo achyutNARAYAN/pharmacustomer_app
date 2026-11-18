@@ -3,9 +3,15 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/errors/failures.dart';
+import '../../core/services/api_service.dart';
 import '../../core/theme.dart';
+import '../auth/providers/auth_provider.dart';
 import 'prescription_upload_sheet.dart';
+import 'providers/prescription_provider.dart';
+import 'repositories/prescription_repository.dart';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -42,6 +48,7 @@ class _PrescriptionReviewState extends State<PrescriptionReview> {
     _loadPdfPreview(widget.file),
   ];
   int _selectedPage = 0;
+  bool _isSubmitting = false;
 
   bool get _isImage => const [
     '.png',
@@ -378,9 +385,22 @@ class _PrescriptionReviewState extends State<PrescriptionReview> {
         width: double.infinity,
         height: 50,
         child: ElevatedButton.icon(
-          onPressed: _submit,
-          icon: const Icon(Icons.send_rounded, size: 18),
-          label: const Text('Submit for Pharmacist Review'),
+          onPressed: _isSubmitting ? null : _submit,
+          icon: _isSubmitting
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Icon(Icons.send_rounded, size: 18),
+          label: Text(
+            _isSubmitting
+                ? 'Submitting to Pharmacist…'
+                : 'Submit for Pharmacist Review',
+          ),
         ),
       ),
     ),
@@ -486,14 +506,108 @@ class _PrescriptionReviewState extends State<PrescriptionReview> {
     });
   }
 
-
   Future<void> _submit() async {
-    final submitted = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(builder: (_) => PrescriptionSubmitted(files: _files)),
+    if (_files.isEmpty || _isSubmitting) return;
+
+    setState(() => _isSubmitting = true);
+
+    final primaryFile = _files[_selectedPage.clamp(0, _files.length - 1)];
+    final patientName = widget.patientName.trim().isNotEmpty
+        ? widget.patientName.trim()
+        : 'Customer';
+
+    String rxId = 'rx_${DateTime.now().millisecondsSinceEpoch}';
+
+    try {
+      if (ApiService.token != null) {
+        final effectiveCustomerId = ApiService.currentCustomerId ??
+            context.read<AuthProvider?>()?.userId;
+
+        final res = await ApiService.uploadPrescription(
+          customerId: effectiveCustomerId,
+          patientName: patientName,
+          prescriptionDate: DateTime.now(),
+          documentUrl: primaryFile.path ?? 'https://res.cloudinary.com/demo/sample_rx.pdf',
+          fileSize: primaryFile.size,
+          mimeType: primaryFile.extension?.toLowerCase() == 'pdf'
+              ? 'application/pdf'
+              : 'image/jpeg',
+        );
+
+        if (res != null) {
+          final doc = res['prescription'] ?? res['data'] ?? res;
+          if (doc is Map && doc['_id'] != null) {
+            rxId = doc['_id'].toString();
+          } else if (res['prescriptionId'] != null) {
+            rxId = res['prescriptionId'].toString();
+          } else if (res['_id'] != null) {
+            rxId = res['_id'].toString();
+          }
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      final message = e is Failure
+          ? e.message
+          : e.toString().replaceAll('Exception: ', '').replaceAll('ValidationFailure: ', '');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Expanded(child: Text('Upload failed: $message')),
+            ],
+          ),
+          backgroundColor: AppTheme.error,
+          behavior: SnackBarBehavior.floating,
+          action: SnackBarAction(
+            label: 'Retry',
+            textColor: Colors.white,
+            onPressed: _submit,
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+
+    // Create canonical domain model
+    final newPrescription = Prescription(
+      id: rxId,
+      source: 'upload',
+      status: PrescriptionStatus.underReview,
+      fileName: primaryFile.name,
+      mime: primaryFile.extension?.toLowerCase() == 'pdf'
+          ? 'application/pdf'
+          : 'image/jpeg',
+      sizeBytes: primaryFile.size,
+      remoteUrl: primaryFile.path,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
     );
-    if (!mounted || submitted != true) return;
-    Navigator.pop(context, true);
+
+    // Atomically register in PrescriptionProvider
+    final rxProvider = context.read<PrescriptionProvider?>();
+    rxProvider?.addPrescription(newPrescription);
+
+    setState(() => _isSubmitting = false);
+
+    // Navigate to acknowledgement screen
+    await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PrescriptionSubmitted(
+          files: _files,
+          prescriptionId: rxId,
+        ),
+      ),
+    );
+
+    if (!mounted) return;
+    Navigator.pop<Prescription>(context, newPrescription);
   }
 }
 
@@ -501,8 +615,13 @@ class _PrescriptionReviewState extends State<PrescriptionReview> {
 
 class PrescriptionSubmitted extends StatelessWidget {
   final List<PlatformFile> files;
+  final String? prescriptionId;
 
-  const PrescriptionSubmitted({super.key, required this.files});
+  const PrescriptionSubmitted({
+    super.key,
+    required this.files,
+    this.prescriptionId,
+  });
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -596,6 +715,41 @@ class PrescriptionSubmitted extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (prescriptionId != null && prescriptionId!.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppTheme.outlineBorder),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.tag_rounded,
+                            size: 13,
+                            color: AppTheme.primary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Rx Ref: $prescriptionId',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.primaryDark,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 24),
                 // Tracker card
                 Container(

@@ -754,6 +754,15 @@ class ApiService {
     return res is Map<String, dynamic> ? res : null;
   }
 
+  /// Delete digital prescription by ID
+  static Future<dynamic> deletePrescription(String prescriptionId) async {
+    try {
+      return await delete(ApiConstants.prescriptionDetail(prescriptionId));
+    } catch (_) {
+      return null;
+    }
+  }
+
   // ── 5. Cart & Pre-Checkout (Module 5 - 11 Endpoints) ─────────────────────
 
   /// 1. Get active customer cart with live catalog reconciliation & summary

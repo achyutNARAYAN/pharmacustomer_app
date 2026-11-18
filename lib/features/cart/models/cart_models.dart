@@ -413,11 +413,17 @@ class CartModel {
     final coupon = map['couponCode'] as String?;
 
     String? rxId;
-    final rawRx = map['prescription'];
+    final rawRx = map['prescription'] ??
+        map['prescriptionId'] ??
+        map['prescription_id'] ??
+        json['prescriptionId'] ??
+        json['prescription'];
     if (rawRx is String) {
       rxId = rawRx;
     } else if (rawRx is Map) {
-      rxId = rawRx['prescriptionId'] as String? ?? rawRx['_id'] as String?;
+      rxId = rawRx['prescriptionId'] as String? ??
+          rawRx['_id'] as String? ??
+          rawRx['id'] as String?;
     }
 
     DateTime? parseDate(dynamic d) {

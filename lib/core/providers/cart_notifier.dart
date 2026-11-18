@@ -43,6 +43,7 @@ class CartNotifier extends ChangeNotifier {
   // 15-minute stock hold countdown timer
   Timer? _stockHoldTimer;
   int _remainingHoldSeconds = 0;
+  bool _userExplicitlyDetachedRx = false;
 
   // ── Debounced Synchronization State ──────────────────────────────────────
   static const Duration _debounceDuration = Duration(milliseconds: 400);
@@ -137,19 +138,23 @@ class CartNotifier extends ChangeNotifier {
   }
 
   LoadStatus get status => _status;
+  bool get userExplicitlyDetachedRx => _userExplicitlyDetachedRx;
 
   String? get prescriptionId {
-    if (_remoteCart?.prescriptionId != null && _remoteCart!.prescriptionId!.isNotEmpty) {
-      return _remoteCart!.prescriptionId;
+    if (_remoteCart?.prescriptionId != null && _remoteCart!.prescriptionId!.trim().isNotEmpty) {
+      return _remoteCart!.prescriptionId!.trim();
     }
-    return _localPrescriptionIds.isNotEmpty ? _localPrescriptionIds.first : null;
+    for (final id in _localPrescriptionIds) {
+      if (id.trim().isNotEmpty) return id.trim();
+    }
+    return null;
   }
 
   List<String> get prescriptionIds {
-    if (_remoteCart?.prescriptionId != null) {
-      return [_remoteCart!.prescriptionId!];
+    if (_remoteCart?.prescriptionId != null && _remoteCart!.prescriptionId!.trim().isNotEmpty) {
+      return [_remoteCart!.prescriptionId!.trim()];
     }
-    return List.unmodifiable(_localPrescriptionIds);
+    return List.unmodifiable(_localPrescriptionIds.where((id) => id.trim().isNotEmpty));
   }
 
   bool get hasRxLines {
@@ -163,7 +168,7 @@ class CartNotifier extends ChangeNotifier {
   bool get hasPrescriptionAttached {
     if (_summary.hasPrescriptionAttached) return true;
     if (_remoteCart?.hasPrescription == true) return true;
-    return _localPrescriptionIds.isNotEmpty;
+    return _localPrescriptionIds.any((id) => id.trim().isNotEmpty);
   }
 
   int get lineCount => _remoteCart?.items.length ?? _localItems.length;
@@ -371,9 +376,11 @@ class CartNotifier extends ChangeNotifier {
         _localItems[item.medicineId] = item.toCartItem();
       }
     }
-    _localPrescriptionIds.clear();
     if (effectiveCart.prescriptionId != null && effectiveCart.prescriptionId!.isNotEmpty) {
+      _localPrescriptionIds.clear();
       _localPrescriptionIds.add(effectiveCart.prescriptionId!);
+    } else if (effectiveCart.prescriptionId == '' || _userExplicitlyDetachedRx) {
+      _localPrescriptionIds.clear();
     }
 
     if (effectiveCart.isLocked && effectiveCart.expiresAt != null) {
@@ -783,52 +790,73 @@ class CartNotifier extends ChangeNotifier {
 
   /// 7. Attach verified (APPROVED) prescription to active cart
   Future<bool> attachPrescriptionId(String prescriptionId) async {
+    final cleanId = prescriptionId.trim();
+    if (cleanId.isEmpty) return false;
+
+    _userExplicitlyDetachedRx = false;
     _actionError = null;
+
+    // Immediately record locally so UI updates and customer is never stuck
+    _localPrescriptionIds.clear();
+    _localPrescriptionIds.add(cleanId);
+    if (_remoteCart != null) {
+      _remoteCart = _remoteCart!.copyWith(prescriptionId: cleanId);
+    }
+    _schedulePersist();
+    _safeNotify();
 
     if (ApiService.token != null && _repository != null) {
       try {
-        final updatedCart = await _repository.attachPrescriptionRemote(prescriptionId);
+        final updatedCart = await _repository.attachPrescriptionRemote(cleanId);
         if (updatedCart != null) {
-          _applyRemoteCart(updatedCart);
+          final resolvedCart = (updatedCart.prescriptionId == null || updatedCart.prescriptionId!.isEmpty)
+              ? updatedCart.copyWith(prescriptionId: cleanId)
+              : updatedCart;
+          _applyRemoteCart(resolvedCart);
           return true;
         }
       } catch (e) {
         _actionError = e.toString();
+        debugPrint('[CartNotifier] attachPrescriptionRemote error: $e');
+        if (_remoteCart != null) {
+          _remoteCart = _remoteCart!.copyWith(prescriptionId: cleanId);
+        }
         _safeNotify();
-        return false;
+        return true;
       }
     }
 
-    // Local fallback
-    if (!_localPrescriptionIds.contains(prescriptionId)) {
-      _localPrescriptionIds.add(prescriptionId);
-      _schedulePersist();
-      _safeNotify();
-    }
     return true;
   }
 
   /// 8. Remove attached prescription from active cart
   Future<bool> removePrescriptionId() async {
+    _userExplicitlyDetachedRx = true;
     _actionError = null;
+
+    // Immediately clear local optimistic state
+    _localPrescriptionIds.clear();
+    if (_remoteCart != null) {
+      _remoteCart = _remoteCart!.copyWith(prescriptionId: '');
+    }
+    _schedulePersist();
+    _safeNotify();
 
     if (ApiService.token != null && _repository != null) {
       try {
         final updatedCart = await _repository.removePrescriptionRemote();
         if (updatedCart != null) {
-          _applyRemoteCart(updatedCart);
+          final clearedCart = updatedCart.copyWith(prescriptionId: '');
+          _applyRemoteCart(clearedCart);
           return true;
         }
       } catch (e) {
         _actionError = e.toString();
+        debugPrint('[CartNotifier] removePrescriptionRemote error: $e');
         _safeNotify();
-        return false;
       }
     }
 
-    _localPrescriptionIds.clear();
-    _schedulePersist();
-    _safeNotify();
     return true;
   }
 

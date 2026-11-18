@@ -64,6 +64,36 @@ class Prescription {
     required this.updatedAt,
   });
 
+  Prescription copyWith({
+    String? id,
+    String? localId,
+    String? source,
+    PrescriptionStatus? status,
+    String? fileName,
+    String? mime,
+    int? sizeBytes,
+    String? remoteUrl,
+    String? rejectionReason,
+    String? doctorName,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return Prescription(
+      id: id ?? this.id,
+      localId: localId ?? this.localId,
+      source: source ?? this.source,
+      status: status ?? this.status,
+      fileName: fileName ?? this.fileName,
+      mime: mime ?? this.mime,
+      sizeBytes: sizeBytes ?? this.sizeBytes,
+      remoteUrl: remoteUrl ?? this.remoteUrl,
+      rejectionReason: rejectionReason ?? this.rejectionReason,
+      doctorName: doctorName ?? this.doctorName,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'localId': localId,
