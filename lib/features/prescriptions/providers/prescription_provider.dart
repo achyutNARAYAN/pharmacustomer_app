@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import '../../../core/errors/failures.dart';
 import '../../../core/providers/load_status.dart';
 import '../../../core/services/api_service.dart';
 import '../repositories/prescription_repository.dart';
@@ -41,22 +42,29 @@ class PrescriptionProvider extends ChangeNotifier {
     _safeNotify();
   }
 
-  Future<bool> deletePrescription(String prescriptionId) async {
-    _prescriptions.removeWhere((p) => p.id == prescriptionId);
+  Future<({bool success, String? message})> deletePrescription(String prescriptionId) async {
+    final cleanId = prescriptionId.trim();
+    if (cleanId.isEmpty) return (success: false, message: 'Invalid prescription ID');
+
+    final isLocalOnly = cleanId.startsWith('rx_');
+
+    _prescriptions.removeWhere((p) => p.id == cleanId);
     if (_repository != null && _userId != null) {
       _repository.schedulePersist(_userId!, _prescriptions);
     }
     _safeNotify();
 
-    if (ApiService.token != null) {
+    if (ApiService.token != null && !isLocalOnly) {
       try {
-        await ApiService.deletePrescription(prescriptionId);
-        return true;
-      } catch (_) {
-        return false;
+        await ApiService.deletePrescription(cleanId);
+        return (success: true, message: null);
+      } catch (e) {
+        debugPrint('[PrescriptionProvider] deletePrescription API error: $e');
+        final String errorMsg = e is Failure ? e.message : e.toString();
+        return (success: false, message: errorMsg);
       }
     }
-    return true;
+    return (success: true, message: null);
   }
 
   void archivePrescription(String prescriptionId) {
@@ -116,8 +124,8 @@ class PrescriptionProvider extends ChangeNotifier {
               'APPROVED' => PrescriptionStatus.approved,
               'REJECTED' => PrescriptionStatus.rejected,
               'EXPIRED' => PrescriptionStatus.expired,
-              'PENDING_REVIEW' => PrescriptionStatus.underReview,
-              _ => PrescriptionStatus.uploaded,
+              'PENDING' || 'UNDER_REVIEW' || 'IN_REVIEW' || 'PENDING_REVIEW' || 'IN_PROGRESS' => PrescriptionStatus.underReview,
+              _ => PrescriptionStatus.underReview,
             };
 
             final existingIndex = _prescriptions.indexWhere((p) => p.id == rxId);

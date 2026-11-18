@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/providers/cart_notifier.dart';
-import '../../core/services/api_service.dart';
 import '../../core/theme.dart';
-import '../auth/providers/auth_provider.dart';
 import '../home/search.dart';
 import 'prescription_review.dart';
 import 'prescription_upload_sheet.dart';
@@ -164,6 +162,7 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
           padding: const EdgeInsets.only(bottom: 14),
           child: _prescriptionCard(
             rxId: p.id,
+            rxStatus: p.status,
             name: p.doctorName ?? 'Consulting Physician',
             subtitle: 'Prescription #${p.id.length > 8 ? p.id.substring(0, 8) : p.id}',
             date: 'Added ${_formatDate(p.createdAt)}',
@@ -301,6 +300,7 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
     required String status,
     required List<(String, String)> medicines,
     String? rxId,
+    PrescriptionStatus rxStatus = PrescriptionStatus.approved,
   }) => Container(
     padding: const EdgeInsets.all(16),
     decoration: _cardDecoration(),
@@ -421,7 +421,7 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () => _showDocument(rxId),
+                onPressed: () => _showDocument(rxId, rxStatus),
                 icon: const Icon(Icons.visibility_outlined, size: 17),
                 label: const Text('View Rx'),
               ),
@@ -551,6 +551,7 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
               'Archived prescription record',
               Colors.orange,
               rxId: p.id,
+              status: p.status,
             ),
           ),
         ),
@@ -566,6 +567,7 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
     String detail,
     Color color, {
     String? rxId,
+    PrescriptionStatus status = PrescriptionStatus.expired,
     bool first = false,
   }) => Container(
     padding: const EdgeInsets.all(18),
@@ -702,7 +704,7 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
                 children: [
                   Expanded(
                     child: TextButton.icon(
-                      onPressed: () => _showDocument(rxId),
+                      onPressed: () => _showDocument(rxId, status),
                       icon: const Icon(Icons.visibility_outlined, size: 18),
                       label: const Text('View document'),
                     ),
@@ -725,7 +727,7 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => _showDocument(rxId),
+                  onPressed: () => _showDocument(rxId, status),
                   icon: const Icon(Icons.visibility_outlined, size: 16),
                   label: const Text('View document'),
                 ),
@@ -896,6 +898,16 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
                   icon: Icons.credit_card_outlined,
                   title: 'Ready for payment',
                 ),
+                const SizedBox(height: 14),
+                OutlinedButton.icon(
+                  onPressed: () => _showDocument(p.id, p.status),
+                  icon: const Icon(Icons.manage_search_outlined, size: 17),
+                  label: const Text('Manage & View Details'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 42),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
               ],
             ),
           ),
@@ -959,10 +971,30 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
     ),
   );
 
-  void _showDocument([String? rxId]) => showPrescriptionDetailSheet(
-    context,
-    prescriptionId: rxId,
-    onArchive: () {
+  void _showDocument([
+    String? rxId,
+    PrescriptionStatus status = PrescriptionStatus.approved,
+  ]) {
+    final rxProvider = context.read<PrescriptionProvider?>();
+    final rx = rxId != null
+        ? rxProvider?.prescriptions.cast<Prescription?>().firstWhere(
+            (p) => p?.id == rxId,
+            orElse: () => null,
+          )
+        : null;
+
+    final docName = rx?.doctorName ?? 'Prescribing Physician';
+    final docSpecialty = rx != null
+        ? 'Prescription #${rx.id.length > 8 ? rx.id.substring(0, 8) : rx.id}'
+        : 'Clinical Prescription';
+
+    showPrescriptionDetailSheet(
+      context,
+      prescriptionId: rxId,
+      status: rx?.status ?? status,
+      doctorName: docName,
+      doctorSpecialty: docSpecialty,
+      onArchive: () {
       if (rxId != null) {
         context.read<PrescriptionProvider?>()?.archivePrescription(rxId);
       }
@@ -978,29 +1010,42 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
     },
     onDelete: () async {
       if (rxId != null) {
-        await context.read<PrescriptionProvider?>()?.deletePrescription(rxId);
+        final prov = context.read<PrescriptionProvider?>();
+        final res = await prov?.deletePrescription(rxId);
+        final success = res?.success ?? true;
         if (!mounted) return;
         final cart = context.read<CartNotifier?>();
         if (cart?.prescriptionId == rxId) {
-          cart?.removePrescriptionId();
+          await cart?.removePrescriptionId();
         }
-      }
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.delete_sweep_rounded, color: Colors.white, size: 20),
-              SizedBox(width: 8),
-              Expanded(child: Text('Prescription deleted permanently.')),
-            ],
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(
+                  success ? Icons.delete_sweep_rounded : Icons.info_outline,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    success
+                        ? 'Prescription deleted permanently.'
+                        : (res?.message ?? 'Could not delete prescription from server.'),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: success ? Colors.redAccent : Colors.orange.shade800,
+            behavior: SnackBarBehavior.floating,
           ),
-          backgroundColor: Colors.redAccent,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+        );
+      }
     },
   );
+  }
 
   void _showRefillSheet() => showPrescriptionRefillSheet(context);
 }

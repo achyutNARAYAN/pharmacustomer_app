@@ -755,12 +755,12 @@ class ApiService {
   }
 
   /// Delete digital prescription by ID
+  /// Endpoint: DELETE https://mdp-mvp.onrender.com/api/v1/prescriptions/:prescriptionId
   static Future<dynamic> deletePrescription(String prescriptionId) async {
-    try {
-      return await delete(ApiConstants.prescriptionDetail(prescriptionId));
-    } catch (_) {
-      return null;
-    }
+    final cleanId = prescriptionId.trim();
+    if (cleanId.isEmpty) return null;
+
+    return await delete(ApiConstants.prescriptionDetail(cleanId));
   }
 
   // ── 5. Cart & Pre-Checkout (Module 5 - 11 Endpoints) ─────────────────────

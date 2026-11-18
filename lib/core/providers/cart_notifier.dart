@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 
+import '../errors/failures.dart';
 import '../models/cart_item.dart';
 import '../../features/cart/models/cart_models.dart';
 import '../../features/cart/models/cart_snapshot.dart';
@@ -532,26 +533,42 @@ class CartNotifier extends ChangeNotifier {
 
     if (!_pendingQuantities.containsKey(key)) return;
     final targetQty = _pendingQuantities[key]!;
+    debugPrint('[CartNotifier._executeSync] key=$key, targetQty=$targetQty');
 
     if (_repository == null || ApiService.token == null) {
+      debugPrint('[CartNotifier._executeSync] SKIP: repo=${_repository != null}, token=${ApiService.token != null}');
       _pendingQuantities.remove(key);
       return;
     }
 
     CartLineItem? remoteItem;
     final mapped = _nameToObjectIdCache[key];
+    final cleanKey = key.startsWith('temp_') ? key.substring(5) : key;
 
     if (_remoteCart != null) {
+      debugPrint('[CartNotifier._executeSync] Searching ${_remoteCart!.items.length} remote items for key=$key, cleanKey=$cleanKey, mapped=$mapped');
       for (final r in _remoteCart!.items) {
-        if (_objectIdRegExp.hasMatch(r.id)) {
-          if (r.id == key ||
-              r.medicineId == key ||
-              (mapped != null && (r.id == mapped || r.medicineId == mapped))) {
-            remoteItem = r;
-            break;
-          }
+        final rClean = r.id.startsWith('temp_') ? r.id.substring(5) : r.id;
+        if (r.id == key ||
+            r.id == cleanKey ||
+            rClean == key ||
+            rClean == cleanKey ||
+            r.medicineId == key ||
+            r.medicineId == cleanKey ||
+            (mapped != null && (r.id == mapped || rClean == mapped || r.medicineId == mapped))) {
+          remoteItem = r;
+          debugPrint('[CartNotifier._executeSync] FOUND remoteItem: id=${r.id}, medicineId=${r.medicineId}, qty=${r.quantity}');
+          break;
         }
       }
+      if (remoteItem == null) {
+        debugPrint('[CartNotifier._executeSync] NO MATCH found. Remote items:');
+        for (final r in _remoteCart!.items) {
+          debugPrint('  - id=${r.id}, medicineId=${r.medicineId}, name=${r.name}');
+        }
+      }
+    } else {
+      debugPrint('[CartNotifier._executeSync] _remoteCart is null');
     }
 
     _inFlightSyncs.add(key);
@@ -559,15 +576,20 @@ class CartNotifier extends ChangeNotifier {
 
     try {
       if (remoteItem != null) {
+        // Use the REAL (non-temp) line item ID for the API call
+        final apiId = remoteItem.id.startsWith('temp_') ? remoteItem.medicineId : remoteItem.id;
         if (targetQty > 0) {
-          if (remoteItem.quantity != targetQty) {
-            final updatedCart = await _repository.updateRemoteQuantity(remoteItem.id, targetQty);
-            if (updatedCart != null) {
-              _applyRemoteCart(updatedCart);
-            }
+          // Always PATCH when we have a pending quantity — the optimistic update
+          // already set remoteItem.quantity to targetQty locally, so comparing
+          // against it would always skip the network call.
+          debugPrint('[CartNotifier._executeSync] PATCH updateRemoteQuantity(apiId=$apiId, qty=$targetQty)');
+          final updatedCart = await _repository.updateRemoteQuantity(apiId, targetQty);
+          if (updatedCart != null) {
+            _applyRemoteCart(updatedCart);
           }
         } else {
-          final updatedCart = await _repository.removeRemoteItem(remoteItem.id);
+          debugPrint('[CartNotifier._executeSync] DELETE removeRemoteItem(apiId=$apiId)');
+          final updatedCart = await _repository.removeRemoteItem(apiId);
           if (updatedCart != null) {
             _applyRemoteCart(updatedCart);
           }
@@ -632,13 +654,16 @@ class CartNotifier extends ChangeNotifier {
         int currentServerQty = 0;
         if (_remoteCart != null) {
           for (final r in _remoteCart!.items) {
-            if (_objectIdRegExp.hasMatch(r.id)) {
-              if (r.id == key ||
-                  r.medicineId == key ||
-                  (mapped != null && (r.id == mapped || r.medicineId == mapped))) {
-                currentServerQty = r.quantity;
-                break;
-              }
+            final rClean = r.id.startsWith('temp_') ? r.id.substring(5) : r.id;
+            if (r.id == key ||
+                r.id == cleanKey ||
+                rClean == key ||
+                rClean == cleanKey ||
+                r.medicineId == key ||
+                r.medicineId == cleanKey ||
+                (mapped != null && (r.id == mapped || rClean == mapped || r.medicineId == mapped))) {
+              currentServerQty = r.quantity;
+              break;
             }
           }
         }
@@ -868,6 +893,13 @@ class CartNotifier extends ChangeNotifier {
 
     try {
       if (ApiService.token != null && _repository != null) {
+        // Guarantee all pending quantity syncs are flushed to the server before validating coupon
+        for (final key in _debounceTimers.keys.toList()) {
+          _debounceTimers[key]?.cancel();
+          _debounceTimers.remove(key);
+          await _executeSync(key);
+        }
+
         final updatedCart = await _repository.applyCouponRemote(code);
         if (updatedCart != null) {
           _applyRemoteCart(updatedCart);
@@ -881,7 +913,9 @@ class CartNotifier extends ChangeNotifier {
       return false;
     } catch (e) {
       _isApplyingCoupon = false;
-      _actionError = e.toString();
+      _actionError = e is Failure
+          ? e.message
+          : e.toString().replaceAll('ValidationFailure: ', '').replaceAll('Exception: ', '');
       _safeNotify();
       return false;
     }
@@ -946,6 +980,7 @@ class CartNotifier extends ChangeNotifier {
 
   void add(CartItem item) {
     final key = item.id;
+    debugPrint('[CartNotifier.add] key=$key, item.name=${item.name}, item.medicineId=${item is CartLineItem ? item.medicineId : "N/A"}');
     if (item.name.isNotEmpty && _objectIdRegExp.hasMatch(key)) {
       _nameToObjectIdCache[item.name] = key;
     }
@@ -956,6 +991,7 @@ class CartNotifier extends ChangeNotifier {
     final newQty = (currentQty == 0 && item.quantity > 1)
         ? item.quantity.clamp(1, 50)
         : (currentQty + 1).clamp(1, 50);
+    debugPrint('[CartNotifier.add] currentQty=$currentQty, newQty=$newQty');
     _pendingQuantities[key] = newQty;
     _pendingFallbackItems[key] = item;
 

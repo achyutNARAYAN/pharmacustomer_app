@@ -536,12 +536,17 @@ class _PrescriptionReviewState extends State<PrescriptionReview> {
 
         if (res != null) {
           final doc = res['prescription'] ?? res['data'] ?? res;
-          if (doc is Map && doc['_id'] != null) {
-            rxId = doc['_id'].toString();
-          } else if (res['prescriptionId'] != null) {
-            rxId = res['prescriptionId'].toString();
-          } else if (res['_id'] != null) {
-            rxId = res['_id'].toString();
+          if (doc is Map) {
+            final serverId = doc['prescriptionId'] ?? doc['_id'] ?? doc['id'] ?? doc['rxId'];
+            if (serverId != null && serverId.toString().trim().isNotEmpty) {
+              rxId = serverId.toString().trim();
+            }
+          }
+          if (rxId.startsWith('rx_')) {
+            final topId = res['prescriptionId'] ?? res['_id'] ?? res['id'] ?? res['rxId'];
+            if (topId != null && topId.toString().trim().isNotEmpty) {
+              rxId = topId.toString().trim();
+            }
           }
         }
       }

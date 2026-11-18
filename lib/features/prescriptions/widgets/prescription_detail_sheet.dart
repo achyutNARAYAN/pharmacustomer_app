@@ -1,34 +1,36 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/services/api_service.dart';
 import '../../../core/theme.dart';
+import '../repositories/prescription_repository.dart';
 
 Future<void> showPrescriptionDetailSheet(
   BuildContext context, {
   required VoidCallback onArchive,
-  VoidCallback? onDelete,
+  Future<void> Function()? onDelete,
   String? prescriptionId,
+  PrescriptionStatus status = PrescriptionStatus.approved,
   String doctorName = 'Prescribing Physician',
   String doctorSpecialty = 'Clinical Prescription',
   String prescriptionDetail = 'Verified & Stored in Vault',
-}) async {
-  String doc = doctorName;
+}) {
+  final doc = doctorName;
   String detail = prescriptionDetail;
 
-  if (prescriptionId != null && prescriptionId.isNotEmpty && ApiService.token != null) {
-    try {
-      final data = await ApiService.getPrescriptionById(prescriptionId);
-      if (data != null) {
-        if (data['doctorName'] != null) doc = data['doctorName'] as String;
-        if (data['status'] != null) {
-          final approvedList = (data['approvedMedicines'] as List?)?.length ?? 0;
-          detail = 'Status: ${data['status']} • $approvedList Approved Medicine(s)';
-        }
-      }
-    } catch (_) {}
+  if (prescriptionDetail == 'Verified & Stored in Vault') {
+    switch (status) {
+      case PrescriptionStatus.underReview:
+        detail = 'Under Review • Pharmacist verification in progress';
+        break;
+      case PrescriptionStatus.rejected:
+        detail = 'Rejected • Schedule H requirements not met';
+        break;
+      case PrescriptionStatus.expired:
+        detail = 'Expired • Valid validity period has lapsed';
+        break;
+      default:
+        detail = 'Verified & Stored in Vault';
+    }
   }
-
-  if (!context.mounted) return;
 
   return showModalBottomSheet<void>(
     context: context,
@@ -69,7 +71,9 @@ Future<void> showPrescriptionDetailSheet(
 
         if (confirmed == true && sheetContext.mounted) {
           Navigator.pop(sheetContext);
-          onDelete?.call();
+          if (onDelete != null) {
+            await onDelete();
+          }
         }
       }
 
@@ -136,53 +140,58 @@ Future<void> showPrescriptionDetailSheet(
                   ),
                 ),
                 const SizedBox(height: 8),
-                ListTile(
-                  leading: const _IconTile(Icons.shopping_bag_outlined),
-                  title: const Text('Order Prescribed Medicines'),
-                  subtitle: const Text(
-                    'Automated cart loading • Express delivery available',
-                  ),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.pop(sheetContext),
-                ),
-                ListTile(
-                  leading: const _IconTile(Icons.history),
-                  title: const Text('View Refill & Dispense History'),
-                  subtitle: const Text('Fulfillment log and verification timestamps'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.pop(sheetContext),
-                ),
-                ListTile(
-                  leading: const _IconTile(Icons.archive_outlined),
-                  title: const Text(
-                    'Archive / Deactivate Prescription',
-                    style: TextStyle(color: Colors.amber),
-                  ),
-                  subtitle: const Text('Stops reminder cadence • Move to inactive'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    onArchive();
-                  },
-                ),
-                ListTile(
-                  leading: Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFEBEE),
-                      borderRadius: BorderRadius.circular(12),
+                if (status == PrescriptionStatus.approved) ...[
+                  ListTile(
+                    leading: const _IconTile(Icons.shopping_bag_outlined),
+                    title: const Text('Order Prescribed Medicines'),
+                    subtitle: const Text(
+                      'Automated cart loading • Express delivery available',
                     ),
-                    child: const Icon(Icons.delete_forever_outlined, color: Colors.red, size: 21),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.pop(sheetContext),
                   ),
-                  title: const Text(
-                    'Delete Prescription Permanently',
-                    style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                  ListTile(
+                    leading: const _IconTile(Icons.history),
+                    title: const Text('View Refill & Dispense History'),
+                    subtitle: const Text('Fulfillment log and verification timestamps'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.pop(sheetContext),
                   ),
-                  subtitle: const Text('Remove file and records from account'),
-                  trailing: const Icon(Icons.delete_outline, color: Colors.red),
-                  onTap: confirmDelete,
-                ),
+                  ListTile(
+                    leading: const _IconTile(Icons.archive_outlined),
+                    title: const Text(
+                      'Archive / Deactivate Prescription',
+                      style: TextStyle(color: Colors.amber),
+                    ),
+                    subtitle: const Text('Stops reminder cadence • Move to inactive'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      onArchive();
+                    },
+                  ),
+                ],
+                if (status == PrescriptionStatus.underReview ||
+                    status == PrescriptionStatus.rejected ||
+                    status == PrescriptionStatus.expired)
+                  ListTile(
+                    leading: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFEBEE),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.delete_forever_outlined, color: Colors.red, size: 21),
+                    ),
+                    title: const Text(
+                      'Delete Prescription Permanently',
+                      style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: const Text('Remove file and records from account'),
+                    trailing: const Icon(Icons.delete_outline, color: Colors.red),
+                    onTap: confirmDelete,
+                  ),
                 const SizedBox(height: 8),
                 SizedBox(
                   width: double.infinity,

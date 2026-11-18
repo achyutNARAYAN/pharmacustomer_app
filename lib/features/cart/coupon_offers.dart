@@ -53,7 +53,11 @@ class _CouponOffersState extends State<CouponOffers> {
       );
     } else {
       setState(() {
-        _errorMessage = cart.actionError ?? 'Unable to apply coupon. Please check minimum order value.';
+        final rawErr = cart.actionError ?? 'Unable to apply coupon. Please check minimum order value.';
+        _errorMessage = rawErr
+            .replaceAll('ValidationFailure: ', '')
+            .replaceAll('NetworkFailure: ', '')
+            .replaceAll('Exception: ', '');
       });
     }
   }
@@ -136,7 +140,7 @@ class _CouponOffersState extends State<CouponOffers> {
             _CouponCard(
               code: 'WELCOME50',
               title: 'Flat ₹50 OFF',
-              description: 'Flat ₹50 discount on minimum order of ₹200 (20,000 paise).',
+              description: 'Flat ₹50 discount on minimum order of ₹200',
               minOrderPaise: 20000,
               currentTotalPaise: itemsTotalPaise,
               isApplied: currentCoupon == 'WELCOME50',
@@ -148,7 +152,7 @@ class _CouponOffersState extends State<CouponOffers> {
             _CouponCard(
               code: 'SAVE10',
               title: '10% OFF up to ₹100',
-              description: '10% discount up to ₹100 on minimum order of ₹300 (30,000 paise).',
+              description: '10% discount up to ₹100 on minimum order of ₹300',
               minOrderPaise: 30000,
               currentTotalPaise: itemsTotalPaise,
               isApplied: currentCoupon == 'SAVE10',

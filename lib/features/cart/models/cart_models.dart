@@ -403,12 +403,15 @@ class CartModel {
       }
     }
 
-    final itemsTotal = (map['itemsTotalPaise'] as num?)?.toInt() ?? 0;
-    final discount = (map['discountPaise'] as num?)?.toInt() ?? 0;
+    final itemsTotal = (map['itemsTotalPaise'] as num?)?.toInt() ??
+        ((map['itemsTotal'] as num?) != null ? ((map['itemsTotal'] as num) * 100).round() : null) ??
+        ((map['subtotal'] as num?) != null ? ((map['subtotal'] as num) * 100).round() : 0);
+    final discount = (map['discountPaise'] as num?)?.toInt() ??
+        ((map['discount'] as num?) != null ? ((map['discount'] as num) * 100).round() : 0);
     final deliveryFee = (map['deliveryFeePaise'] as num?)?.toInt() ??
-        (items.isEmpty || itemsTotal >= 50000 ? 0 : 4000);
+        ((map['deliveryFee'] as num?) != null ? ((map['deliveryFee'] as num) * 100).round() : (items.isEmpty || itemsTotal >= 50000 ? 0 : 4000));
     final totalPayable = (map['totalPayablePaise'] as num?)?.toInt() ??
-        (itemsTotal - discount + deliveryFee).clamp(0, 999999999);
+        ((map['totalPayable'] as num?) != null ? ((map['totalPayable'] as num) * 100).round() : (itemsTotal - discount + deliveryFee).clamp(0, 999999999));
 
     final coupon = map['couponCode'] as String?;
 

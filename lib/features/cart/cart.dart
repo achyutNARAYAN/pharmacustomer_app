@@ -423,14 +423,11 @@ class Cart extends StatelessWidget {
           color: Colors.white,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           clipBehavior: Clip.antiAlias,
-          child: SafeArea(
-            top: false,
-            child: Container(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(ctx).size.height * 0.82,
-              ),
+          child: SizedBox(
+            height: MediaQuery.of(ctx).size.height * 0.80,
+            child: SafeArea(
+              top: false,
               child: Column(
-                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Top Handle & Header
@@ -632,18 +629,30 @@ class Cart extends StatelessWidget {
                                       )
                                     else
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                         decoration: BoxDecoration(
-                                          color: AppTheme.surfaceContainerDim,
-                                          borderRadius: BorderRadius.circular(10),
-                                        ),
-                                        child: Text(
-                                          isUnderReview ? 'In Review' : 'Unavailable',
-                                          style: const TextStyle(
-                                            color: AppTheme.mutedText,
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 11,
+                                          color: isUnderReview ? const Color(0xFFFEF3C7) : const Color(0xFFF1F5F9),
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(
+                                            color: isUnderReview ? const Color(0xFFFDE68A) : const Color(0xFFE2E8F0),
                                           ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            if (isUnderReview) ...[
+                                              const Icon(Icons.schedule, size: 13, color: Color(0xFFB45309)),
+                                              const SizedBox(width: 4),
+                                            ],
+                                            Text(
+                                              isUnderReview ? 'In Review' : 'Unavailable',
+                                              style: TextStyle(
+                                                color: isUnderReview ? const Color(0xFF92400E) : AppTheme.mutedText,
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 11,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                   ],
@@ -656,12 +665,13 @@ class Cart extends StatelessWidget {
                   // Bottom Action Buttons (Never Overflows!)
                   const Divider(height: 1),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                    padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         SizedBox(
                           width: double.infinity,
+                          height: 46,
                           child: ElevatedButton.icon(
                             onPressed: () {
                               Navigator.pop(ctx);
@@ -674,6 +684,7 @@ class Cart extends StatelessWidget {
                         const SizedBox(height: 8),
                         SizedBox(
                           width: double.infinity,
+                          height: 44,
                           child: OutlinedButton.icon(
                             onPressed: () {
                               final profile = context.read<ProfileNotifier?>();

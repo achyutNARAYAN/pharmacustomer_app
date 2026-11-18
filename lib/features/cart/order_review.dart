@@ -134,7 +134,7 @@ class OrderReview extends StatelessWidget {
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
-                      'Pharmacy: ${cart.allocatedStore} • 4km FEFO Verified',
+                      'Pharmacy: ${cart.allocatedStore}',
                       style: const TextStyle(fontSize: 11, color: AppTheme.primaryDark, fontWeight: FontWeight.w600),
                     ),
                   ),
@@ -142,8 +142,6 @@ class OrderReview extends StatelessWidget {
               ),
             ],
           ])),
-          const SizedBox(width: 8),
-          const Text('22 min', style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold)),
           TextButton(
             onPressed: () => Navigator.push(
               context,
@@ -191,7 +189,7 @@ class OrderReview extends StatelessWidget {
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 const SizedBox(height: 4),
-                Text('${item.pack} · ${item.quantity} unit(s)', style: const TextStyle(color: AppTheme.mutedText)),
+                Text('${item.pack} · ${item.quantity} unit', style: const TextStyle(color: AppTheme.mutedText)),
               ])),
               const SizedBox(width: 8),
               Text('₹${item.total.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.w600)),
