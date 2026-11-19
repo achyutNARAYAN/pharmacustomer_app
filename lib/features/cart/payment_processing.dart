@@ -47,6 +47,7 @@ class _PaymentProcessingState extends State<PaymentProcessing> {
           totalPaise: (totalPaid * 100).round(),
           itemCount: totalCount,
           createdAt: DateTime.now(),
+          items: orderedItems,
         ),
       );
 
@@ -58,6 +59,7 @@ class _PaymentProcessingState extends State<PaymentProcessing> {
         context,
         MaterialPageRoute<void>(
           builder: (_) => OrderPlaced(
+            orderId: orderId,
             orderedItems: orderedItems,
             totalPaid: totalPaid,
             totalCount: totalCount,

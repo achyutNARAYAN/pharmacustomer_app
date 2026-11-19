@@ -571,36 +571,64 @@ class CartNotifier extends ChangeNotifier {
       debugPrint('[CartNotifier._executeSync] _remoteCart is null');
     }
 
+    bool syncSucceeded = false;
     _inFlightSyncs.add(key);
     _actionError = null;
 
     try {
-      if (remoteItem != null) {
-        // Use the REAL (non-temp) line item ID for the API call
-        final apiId = remoteItem.id.startsWith('temp_') ? remoteItem.medicineId : remoteItem.id;
+      final bool isRealRemoteItem = remoteItem != null && !remoteItem.id.startsWith('temp_');
+
+      if (isRealRemoteItem) {
+        // Real line item in cart on server
+        final apiId = remoteItem.id;
         if (targetQty > 0) {
           // Always PATCH when we have a pending quantity — the optimistic update
           // already set remoteItem.quantity to targetQty locally, so comparing
           // against it would always skip the network call.
           debugPrint('[CartNotifier._executeSync] PATCH updateRemoteQuantity(apiId=$apiId, qty=$targetQty)');
-          final updatedCart = await _repository.updateRemoteQuantity(apiId, targetQty);
-          if (updatedCart != null) {
-            _applyRemoteCart(updatedCart);
+          try {
+            final updatedCart = await _repository.updateRemoteQuantity(apiId, targetQty);
+            if (updatedCart != null) {
+              syncSucceeded = true;
+              _applyRemoteCart(updatedCart);
+            }
+          } catch (e) {
+            // Self-healing: If server returns 404 (item not found in cart), attempt to add it
+            final errorStr = e.toString().toLowerCase();
+            if (errorStr.contains('not found') || errorStr.contains('404')) {
+              debugPrint('[CartNotifier._executeSync] Item $apiId not found in cart on server. Falling back to addRemoteItem.');
+              final medId = (remoteItem.medicineId.isNotEmpty && _objectIdRegExp.hasMatch(remoteItem.medicineId))
+                  ? remoteItem.medicineId
+                  : cleanKey;
+              final updatedCart = await _repository.addRemoteItem(medId, targetQty);
+              if (updatedCart != null) {
+                syncSucceeded = true;
+                _applyRemoteCart(updatedCart);
+              }
+            } else {
+              rethrow;
+            }
           }
         } else {
           debugPrint('[CartNotifier._executeSync] DELETE removeRemoteItem(apiId=$apiId)');
           final updatedCart = await _repository.removeRemoteItem(apiId);
           if (updatedCart != null) {
+            syncSucceeded = true;
             _applyRemoteCart(updatedCart);
           }
         }
       } else {
+        // Item is not yet in cart on the server (remoteItem is null or has temporary optimistic ID)
         if (targetQty > 0) {
-          String resolvedId = key;
-          final fallback = _pendingFallbackItems[key];
+          String resolvedId = cleanKey;
+          if (remoteItem != null && remoteItem.medicineId.isNotEmpty && _objectIdRegExp.hasMatch(remoteItem.medicineId)) {
+            resolvedId = remoteItem.medicineId;
+          }
+          final fallback = _pendingFallbackItems[key] ?? _pendingFallbackItems[cleanKey];
 
           if (!_objectIdRegExp.hasMatch(resolvedId)) {
             final cached = _nameToObjectIdCache[key] ??
+                _nameToObjectIdCache[cleanKey] ??
                 _nameToObjectIdCache[fallback?.name ?? ''];
             if (cached != null) {
               resolvedId = cached;
@@ -623,6 +651,7 @@ class CartNotifier extends ChangeNotifier {
                     if (isNameMatch) {
                       resolvedId = candidate;
                       _nameToObjectIdCache[key] = candidate;
+                      _nameToObjectIdCache[cleanKey] = candidate;
                       if (fallback?.name != null) {
                         _nameToObjectIdCache[fallback!.name] = candidate;
                       }
@@ -635,11 +664,20 @@ class CartNotifier extends ChangeNotifier {
           }
 
           if (_objectIdRegExp.hasMatch(resolvedId) || (!resolvedId.contains('-') && !resolvedId.contains(' ') && !resolvedId.contains('_forte'))) {
+            debugPrint('[CartNotifier._executeSync] POST addRemoteItem(resolvedId=$resolvedId, qty=$targetQty)');
             final updatedCart = await _repository.addRemoteItem(resolvedId, targetQty);
             if (updatedCart != null) {
+              syncSucceeded = true;
               _applyRemoteCart(updatedCart);
             }
           }
+        } else {
+          // targetQty <= 0 and item was never added to server cart
+          syncSucceeded = true;
+          _pendingQuantities.remove(key);
+          _pendingQuantities.remove(cleanKey);
+          _pendingFallbackItems.remove(key);
+          _pendingFallbackItems.remove(cleanKey);
         }
       }
     } catch (e) {
@@ -651,25 +689,12 @@ class CartNotifier extends ChangeNotifier {
 
       if (_pendingQuantities.containsKey(key)) {
         final latestTarget = _pendingQuantities[key]!;
-        int currentServerQty = 0;
-        if (_remoteCart != null) {
-          for (final r in _remoteCart!.items) {
-            final rClean = r.id.startsWith('temp_') ? r.id.substring(5) : r.id;
-            if (r.id == key ||
-                r.id == cleanKey ||
-                rClean == key ||
-                rClean == cleanKey ||
-                r.medicineId == key ||
-                r.medicineId == cleanKey ||
-                (mapped != null && (r.id == mapped || rClean == mapped || r.medicineId == mapped))) {
-              currentServerQty = r.quantity;
-              break;
-            }
-          }
-        }
-
-        if (latestTarget != currentServerQty) {
+        if (latestTarget != targetQty) {
+          debugPrint('[CartNotifier._executeSync] Target changed during sync ($targetQty -> $latestTarget). Scheduling sync for new target.');
           _scheduleDebouncedSync(key);
+        } else if (syncSucceeded) {
+          _pendingQuantities.remove(key);
+          _pendingFallbackItems.remove(key);
         } else {
           _pendingQuantities.remove(key);
         }

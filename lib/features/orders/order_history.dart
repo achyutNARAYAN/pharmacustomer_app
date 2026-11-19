@@ -161,6 +161,7 @@ class _OrderHistoryState extends State<OrderHistory> {
                         '${order.itemCount} item(s) ordered · Placed ${_formatDate(order.createdAt)}',
                       ],
                       primary: order.isActive,
+                      order: order,
                     ),
                   ),
                 ),
@@ -202,10 +203,12 @@ class _OrderCard extends StatelessWidget {
     required this.total,
     required this.items,
     this.primary = false,
+    this.order,
   });
   final String id, status, total;
   final List<String> items;
   final bool primary;
+  final OrderItem? order;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -285,7 +288,14 @@ class _OrderCard extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: () => Navigator.push(
                   context,
-                  MaterialPageRoute<void>(builder: (_) => const TaxInvoice()),
+                  MaterialPageRoute<void>(
+                    builder: (_) => TaxInvoice(
+                      orderId: order?.orderId ?? id.replaceAll('#', ''),
+                      items: order?.items,
+                      totalPaid: order != null ? order!.totalPaise / 100.0 : null,
+                      orderDate: order?.createdAt,
+                    ),
+                  ),
                 ),
                 icon: const Icon(Icons.description_outlined, size: 19),
                 label: const Text('Invoice'),

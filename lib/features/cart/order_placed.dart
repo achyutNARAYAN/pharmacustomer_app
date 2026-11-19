@@ -9,12 +9,14 @@ import 'tax_invoice.dart';
 import 'live_tracking.dart';
 
 class OrderPlaced extends StatelessWidget {
+  final String? orderId;
   final List<CartItem>? orderedItems;
   final double? totalPaid;
   final int? totalCount;
 
   const OrderPlaced({
     super.key,
+    this.orderId,
     this.orderedItems,
     this.totalPaid,
     this.totalCount,
@@ -47,7 +49,12 @@ class OrderPlaced extends StatelessWidget {
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute<void>(
-                builder: (_) => const TaxInvoice(),
+                builder: (_) => TaxInvoice(
+                  orderId: orderId,
+                  items: items,
+                  totalPaid: paid,
+                  orderDate: DateTime.now(),
+                ),
               ),
             ),
             icon: const Icon(Icons.receipt_long_outlined),
