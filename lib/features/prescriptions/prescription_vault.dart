@@ -10,7 +10,6 @@ import 'providers/prescription_provider.dart';
 import 'repositories/prescription_repository.dart';
 import 'widgets/prescription_progress_step.dart';
 import 'widgets/prescription_detail_sheet.dart';
-import 'widgets/prescription_refill_sheet.dart';
 
 class PrescriptionVault extends StatefulWidget {
   final String patientName;
@@ -417,24 +416,13 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
           ),
         ),
         const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () => _showDocument(rxId, rxStatus),
-                icon: const Icon(Icons.visibility_outlined, size: 17),
-                label: const Text('View Rx'),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: _showRefillSheet,
-                icon: const Icon(Icons.shopping_bag_outlined, size: 17),
-                label: const Text('Reorder All Medicines'),
-              ),
-            ),
-          ],
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () => _showDocument(rxId, rxStatus),
+            icon: const Icon(Icons.visibility_outlined, size: 17),
+            label: const Text('View Rx'),
+          ),
         ),
       ],
     ),
@@ -1046,6 +1034,4 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
     },
   );
   }
-
-  void _showRefillSheet() => showPrescriptionRefillSheet(context);
 }

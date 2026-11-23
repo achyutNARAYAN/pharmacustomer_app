@@ -154,13 +154,12 @@ class _OrderHistoryState extends State<OrderHistory> {
                   (order) => Padding(
                     padding: const EdgeInsets.only(bottom: 16),
                     child: _OrderCard(
-                      id: '#${order.orderId}',
+                      id: '${order.orderId}',
                       status: _formatOrderStatus(order.status),
                       total: '₹${(order.totalPaise / 100).toStringAsFixed(0)}',
                       items: [
-                        '${order.itemCount} item(s) ordered · Placed ${_formatDate(order.createdAt)}',
+                        '${order.itemCount} item ordered · Placed ${_formatDate(order.createdAt)}',
                       ],
-                      primary: order.isActive,
                       order: order,
                     ),
                   ),
@@ -202,12 +201,10 @@ class _OrderCard extends StatelessWidget {
     required this.status,
     required this.total,
     required this.items,
-    this.primary = false,
     this.order,
   });
   final String id, status, total;
   final List<String> items;
-  final bool primary;
   final OrderItem? order;
 
   @override
@@ -316,18 +313,6 @@ class _OrderCard extends StatelessWidget {
             ),
           ],
         ),
-        if (primary) ...[
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () {},
-              icon: const Icon(Icons.replay_rounded, size: 19),
-              label: const Text('Reorder'),
-              style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 48)),
-            ),
-          ),
-        ],
       ],
     ),
   );
