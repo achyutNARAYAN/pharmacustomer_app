@@ -314,15 +314,15 @@ class _AddEditAddressSheetState extends State<AddEditAddressSheet> {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final isEditing = widget.initialAddress != null;
 
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.9,
-      ),
-      child: SafeArea(
+    return Material(
+      color: Colors.white,
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      clipBehavior: Clip.antiAlias,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.9,
+        ),
+        child: SafeArea(
         child: Padding(
           padding: EdgeInsets.fromLTRB(20, 16, 20, 16 + bottomInset),
           child: Form(
@@ -594,19 +594,22 @@ class _AddEditAddressSheetState extends State<AddEditAddressSheet> {
                   const SizedBox(height: 8),
 
                   // Default Address Switch
-                  SwitchListTile.adaptive(
-                    value: _isDefault,
-                    activeTrackColor: AppTheme.primary,
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text(
-                      'Set as default delivery address',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  Material(
+                    color: Colors.transparent,
+                    child: SwitchListTile.adaptive(
+                      value: _isDefault,
+                      activeTrackColor: AppTheme.primary,
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text(
+                        'Set as default delivery address',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: const Text(
+                        'Used as default for express deliveries & orders',
+                        style: TextStyle(fontSize: 12, color: AppTheme.mutedText),
+                      ),
+                      onChanged: (val) => setState(() => _isDefault = val),
                     ),
-                    subtitle: const Text(
-                      'Used as default for express deliveries & orders',
-                      style: TextStyle(fontSize: 12, color: AppTheme.mutedText),
-                    ),
-                    onChanged: (val) => setState(() => _isDefault = val),
                   ),
                   const SizedBox(height: 16),
 
@@ -634,6 +637,7 @@ class _AddEditAddressSheetState extends State<AddEditAddressSheet> {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 }

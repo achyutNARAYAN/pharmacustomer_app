@@ -184,12 +184,16 @@ class OrderPlaced extends StatelessWidget {
   }
 }
 
-Widget _card(Widget child) => Container(
-  padding: const EdgeInsets.all(16),
-  decoration: BoxDecoration(
-    color: Colors.white,
+Widget _card(Widget child) => Material(
+  color: Colors.white,
+  borderRadius: BorderRadius.circular(18),
+  shape: RoundedRectangleBorder(
     borderRadius: BorderRadius.circular(18),
-    border: Border.all(color: AppTheme.outlineBorder),
+    side: const BorderSide(color: AppTheme.outlineBorder),
   ),
-  child: child,
+  clipBehavior: Clip.antiAlias,
+  child: Padding(
+    padding: const EdgeInsets.all(16),
+    child: child,
+  ),
 );
