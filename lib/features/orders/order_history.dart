@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme.dart';
+import '../../core/widgets/customer_support_sheet.dart';
 import '../cart/live_tracking.dart';
 import '../cart/tax_invoice.dart';
 import '../home/search.dart';
@@ -28,6 +29,11 @@ class _OrderHistoryState extends State<OrderHistory> {
         centerTitle: true,
         title: const Text('Order History'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.support_agent_rounded),
+            tooltip: '24x7 Help & Support',
+            onPressed: () => showCustomerSupportSheet(context),
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: Center(
@@ -312,6 +318,24 @@ class _OrderCard extends StatelessWidget {
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 6),
+        Center(
+          child: TextButton.icon(
+            onPressed: () => showCustomerSupportSheet(
+              context,
+              orderId: order?.orderId ?? id.replaceAll('#', ''),
+            ),
+            icon: const Icon(Icons.support_agent_rounded, size: 16, color: AppTheme.primary),
+            label: const Text(
+              'Need help with this order?',
+              style: TextStyle(
+                color: AppTheme.primary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
         ),
       ],
     ),

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme.dart';
+import '../../core/widgets/customer_support_sheet.dart';
 import '../auth/login.dart';
 import '../auth/providers/auth_provider.dart';
 import '../orders/order_history.dart';
@@ -209,6 +210,13 @@ class ProfileHome extends StatelessWidget {
                   context,
                   MaterialPageRoute<void>(builder: (_) => const OrderHistory()),
                 ),
+              ),
+              const Divider(height: 1, indent: 64),
+              _AccountRow(
+                icon: Icons.support_agent_rounded,
+                title: '24x7 Customer Support',
+                subtitle: 'Instant WhatsApp chat, toll-free call & FAQs',
+                onTap: () => showCustomerSupportSheet(context),
               ),
               const Divider(height: 1, indent: 64),
               _AccountRow(

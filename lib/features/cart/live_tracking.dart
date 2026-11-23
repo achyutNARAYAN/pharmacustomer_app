@@ -9,6 +9,7 @@ import '../../core/providers/profile_notifier.dart';
 import '../../core/services/api_service.dart';
 import '../../core/theme.dart';
 import '../../core/utils/address_coordinate_resolver.dart';
+import '../../core/widgets/customer_support_sheet.dart';
 import '../orders/providers/orders_provider.dart';
 import '../profile/models/customer_address.dart';
 import '../profile/providers/customer_address_provider.dart';
@@ -564,6 +565,23 @@ class _LiveTrackingState extends State<LiveTracking> {
                           ),
                         ),
                       ],
+                    ),
+
+                    const SizedBox(height: 6),
+                    SizedBox(
+                      width: double.infinity,
+                      child: TextButton.icon(
+                        onPressed: () => showCustomerSupportSheet(context, orderId: tracking.orderId),
+                        icon: const Icon(Icons.support_agent_rounded, size: 18, color: AppTheme.primary),
+                        label: const Text(
+                          'Need delivery help? Chat with Support',
+                          style: TextStyle(
+                            color: AppTheme.primary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
                     ),
 
                     const SizedBox(height: 14),

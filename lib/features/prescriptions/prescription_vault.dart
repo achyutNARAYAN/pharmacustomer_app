@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/providers/cart_notifier.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/customer_support_sheet.dart';
 import '../home/search.dart';
 import 'prescription_review.dart';
 import 'prescription_upload_sheet.dart';
@@ -88,6 +89,14 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
         title: const Text('Prescription Vault'),
         actions: [
           IconButton(
+            tooltip: 'Pharmacist Support',
+            onPressed: () => showCustomerSupportSheet(
+              context,
+              customQuery: 'Hi Pharmacist, I need help with my prescriptions.',
+            ),
+            icon: const Icon(Icons.support_agent_rounded, color: AppTheme.primary),
+          ),
+          IconButton(
             onPressed: _showInfo,
             icon: const Icon(Icons.info_outline, color: AppTheme.textSecondary),
           ),
@@ -163,11 +172,11 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
             rxId: p.id,
             rxStatus: p.status,
             name: p.doctorName ?? 'Consulting Physician',
-            subtitle: 'Prescription #${p.id.length > 8 ? p.id.substring(0, 8) : p.id}',
+            subtitle: 'Prescription ${p.id.length > 8 ? p.id.substring(0, 8) : p.id}',
             date: 'Added ${_formatDate(p.createdAt)}',
             status: p.status.chipLabel,
             medicines: [
-              (p.fileName, '${(p.sizeBytes / 1024).toStringAsFixed(1)} KB • Digital Rx'),
+              (p.fileName, '${(p.sizeBytes / 1024).toStringAsFixed(1)} KB'),
             ],
           ),
         ),
@@ -330,21 +339,13 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
                       color: AppTheme.textSecondary,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '▣  $date',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppTheme.textSecondary,
-                    ),
-                  ),
                 ],
               ),
             ),
             _pill(status, const Color(0xFFE5F5EE), const Color(0xFF168457)),
           ],
         ),
-        const Divider(height: 24),
+        const Divider(height: 12),
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
@@ -358,14 +359,14 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Linked Prescribed\nMedications (2)',
+                    'Linked Prescribed Medications',
                     style: TextStyle(
                       fontSize: 11,
                       color: AppTheme.textSecondary,
                     ),
                   ),
                   Text(
-                    'Dosage Refills\nAvailable',
+                    'Dosage Refills Available',
                     style: TextStyle(
                       fontSize: 11,
                       color: AppTheme.primary,
@@ -421,7 +422,7 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
           child: OutlinedButton.icon(
             onPressed: () => _showDocument(rxId, rxStatus),
             icon: const Icon(Icons.visibility_outlined, size: 17),
-            label: const Text('View Rx'),
+            label: const Text('View'),
           ),
         ),
       ],
@@ -533,7 +534,7 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
             padding: const EdgeInsets.only(bottom: 14),
             child: _archiveCard(
               p.doctorName ?? 'Consulting Physician',
-              'Prescription #${p.id.length > 8 ? p.id.substring(0, 8) : p.id}',
+              'Prescription ${p.id.length > 8 ? p.id.substring(0, 8) : p.id}',
               'Expired on ${_formatDate(p.createdAt)}',
               p.fileName,
               'Archived prescription record',
@@ -973,7 +974,7 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
 
     final docName = rx?.doctorName ?? 'Prescribing Physician';
     final docSpecialty = rx != null
-        ? 'Prescription #${rx.id.length > 8 ? rx.id.substring(0, 8) : rx.id}'
+        ? 'Prescription ${rx.id.length > 8 ? rx.id.substring(0, 8) : rx.id}'
         : 'Clinical Prescription';
 
     showPrescriptionDetailSheet(

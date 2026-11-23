@@ -8,6 +8,7 @@ import '../../core/theme.dart';
 import '../../core/models/medicine_model.dart';
 import '../../core/providers/cart_notifier.dart';
 import '../../core/services/api_service.dart';
+import '../../core/widgets/customer_support_sheet.dart';
 import 'search.dart';
 import '../cart/address.dart';
 import '../cart/cart.dart';
@@ -138,6 +139,11 @@ class _HomeState extends State<Home> {
         ],
       ),
       actions: [
+        IconButton(
+          icon: const Icon(Icons.support_agent_rounded),
+          tooltip: '24x7 Help & Support',
+          onPressed: () => showCustomerSupportSheet(context),
+        ),
         Consumer<CartNotifier>(
           builder: (context, cart, _) => Stack(
             clipBehavior: Clip.none,
