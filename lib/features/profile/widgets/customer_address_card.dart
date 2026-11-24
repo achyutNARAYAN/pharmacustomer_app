@@ -165,21 +165,6 @@ class CustomerAddressCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 10),
-
-              // Address ID (Subtle)
-              if (address.id.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Text(
-                    'ID: ${address.id}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontFamily: 'monospace',
-                      color: Colors.grey.shade500,
-                    ),
-                  ),
-                ),
-
               // Address Line 1
               Text(
                 address.addressLine1,

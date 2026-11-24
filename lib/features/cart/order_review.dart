@@ -16,6 +16,13 @@ class OrderReview extends StatelessWidget {
   final double amount;
   final String method;
 
+  String _formatPharmacyName(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return '';
+    final words = raw.trim().split(RegExp(r'\s+'));
+    if (words.length <= 2) return words.join(' ');
+    return '${words[0]} ${words[1]}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartNotifier>();
@@ -122,8 +129,6 @@ class OrderReview extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 5),
-            Text('$addressTypeLabel · $customerName', style: const TextStyle(color: AppTheme.mutedText)),
             const SizedBox(height: 3),
             Text(deliveryAddress, style: const TextStyle(color: AppTheme.mutedText, height: 1.35)),
             if (cart.allocatedStore != null) ...[
@@ -134,7 +139,9 @@ class OrderReview extends StatelessWidget {
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
-                      'Pharmacy: ${cart.allocatedStore}',
+                      'Pharmacy: ${_formatPharmacyName(cart.allocatedStore)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontSize: 11, color: AppTheme.primaryDark, fontWeight: FontWeight.w600),
                     ),
                   ),
@@ -142,13 +149,6 @@ class OrderReview extends StatelessWidget {
               ),
             ],
           ])),
-          TextButton(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute<void>(builder: (_) => const Address(popOnSelect: true)),
-            ),
-            child: const Text('Change'),
-          ),
         ])),
         if (!isServiceable) ...[
           const SizedBox(height: 12),
@@ -237,7 +237,6 @@ class OrderReview extends StatelessWidget {
             const SizedBox(height: 3),
             Text(method, style: const TextStyle(color: AppTheme.mutedText)),
           ])),
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Change')),
         ])),
         const SizedBox(height: 18),
         const Row(crossAxisAlignment: CrossAxisAlignment.start, children: [

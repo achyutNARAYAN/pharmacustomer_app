@@ -31,14 +31,23 @@ class _SearchState extends State<Search> {
   @override
   void initState() {
     super.initState();
-    _fetchLiveMedicines('');
+    // Do not eagerly call API on startup with empty query.
+    // When query is empty, _buildBrowseCategoriesView() is rendered.
   }
 
   void _onSearchChanged(String val) {
     setState(() {});
     _debounceTimer?.cancel();
+    final trimmed = val.trim();
+    if (trimmed.isEmpty) {
+      setState(() {
+        _liveMedicines = [];
+        _isSearching = false;
+      });
+      return;
+    }
     _debounceTimer = Timer(const Duration(milliseconds: 350), () {
-      _fetchLiveMedicines(val.trim());
+      _fetchLiveMedicines(trimmed);
     });
   }
 
@@ -94,7 +103,15 @@ class _SearchState extends State<Search> {
             onChanged: _onSearchChanged,
             onSubmitted: (val) {
               _debounceTimer?.cancel();
-              _fetchLiveMedicines(val.trim());
+              final trimmed = val.trim();
+              if (trimmed.isNotEmpty) {
+                _fetchLiveMedicines(trimmed);
+              } else {
+                setState(() {
+                  _liveMedicines = [];
+                  _isSearching = false;
+                });
+              }
             },
             decoration: InputDecoration(
               hintText: 'Search medicines, brands, generics...',
@@ -115,8 +132,11 @@ class _SearchState extends State<Search> {
                       ),
                       onPressed: () {
                         _debounceTimer?.cancel();
-                        setState(() => _searchController.clear());
-                        _fetchLiveMedicines('');
+                        setState(() {
+                          _searchController.clear();
+                          _liveMedicines = [];
+                          _isSearching = false;
+                        });
                       },
                     ),
                 ],

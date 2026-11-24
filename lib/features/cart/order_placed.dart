@@ -35,6 +35,13 @@ class OrderPlaced extends StatelessWidget {
     this.paymentMethod,
   });
 
+  String _formatPharmacyName(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return '';
+    final words = raw.trim().split(RegExp(r'\s+'));
+    if (words.length <= 2) return words.join(' ');
+    return '${words[0]} ${words[1]}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartNotifier>();
@@ -134,15 +141,9 @@ class OrderPlaced extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  'Payment Confirmed · Order placed successfully!',
+                  'Payment Confirmed Order placed successfully!',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  '⚡ Estimated delivery in 22 mins · by 3:15 PM',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: AppTheme.primaryDark, fontWeight: FontWeight.w600),
                 ),
                 if (orderId != null) ...[
                   const SizedBox(height: 12),
@@ -217,7 +218,9 @@ class OrderPlaced extends StatelessWidget {
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
-                                'Pharmacy: $effectiveStore',
+                                'Pharmacy: ${_formatPharmacyName(effectiveStore)}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   fontSize: 11,
                                   color: AppTheme.primaryDark,

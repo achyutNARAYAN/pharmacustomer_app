@@ -45,7 +45,10 @@ class _HomeState extends State<Home> {
     _fetchTrending();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        context.read<CartNotifier>().refresh();
+        final cart = context.read<CartNotifier>();
+        if (cart.remoteCart == null && !cart.isHydrating) {
+          cart.refresh();
+        }
       }
     });
   }
@@ -291,8 +294,6 @@ class _HomeState extends State<Home> {
             Expanded(child: Text('Search medicines, brands, generics...',
                 maxLines: 1, overflow: TextOverflow.ellipsis,
                 style: TextStyle(color: AppTheme.textDisabled, fontSize: 14))),
-            const SizedBox(width: 8),
-            const Icon(Icons.mic_outlined, color: AppTheme.primary, size: 20),
           ],
         ),
       ),

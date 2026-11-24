@@ -370,13 +370,6 @@ class _AddEditAddressSheetState extends State<AddEditAddressSheet> {
                                 color: AppTheme.text,
                               ),
                             ),
-                            const Text(
-                              '5. Customer Address Management',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppTheme.mutedText,
-                              ),
-                            ),
                           ],
                         ),
                       ),

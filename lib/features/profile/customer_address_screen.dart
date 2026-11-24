@@ -177,50 +177,7 @@ class _AddressManagementViewState extends State<_AddressManagementView> {
             onRefresh: provider.refresh,
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
-              children: [
-                // Info Banner
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE6F5F8),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFC7EBF0)),
-                  ),
-                  child: const Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.shield_outlined, color: AppTheme.primary, size: 22),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Verified Doorstep Delivery',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: AppTheme.primary,
-                              ),
-                            ),
-                            SizedBox(height: 3),
-                            Text(
-                              'Maintain multiple delivery addresses (HOME, WORK, OTHER). Every address PIN code is checked for dark store serviceability before order authorization.',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppTheme.textSecondary,
-                                height: 1.35,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Type Filter Chips: ALL | HOME | WORK | OTHER
+              children: [                // Type Filter Chips: ALL | HOME | WORK | OTHER
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(

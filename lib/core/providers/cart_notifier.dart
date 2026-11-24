@@ -139,6 +139,7 @@ class CartNotifier extends ChangeNotifier {
   }
 
   LoadStatus get status => _status;
+  bool get isHydrating => _status == LoadStatus.hydrating || _isSyncingRemote;
   bool get userExplicitlyDetachedRx => _userExplicitlyDetachedRx;
 
   String? get prescriptionId {
@@ -704,9 +705,12 @@ class CartNotifier extends ChangeNotifier {
 
   // ── 11 Cart & Checkout REST API Integrations ──────────────────────────────
 
+  bool _isSyncingRemote = false;
+
   /// 1. Sync active customer cart with live catalogue pricing and summary flags
   Future<void> syncRemoteCart() async {
-    if (_repository == null || ApiService.token == null) return;
+    if (_isSyncingRemote || _repository == null || ApiService.token == null) return;
+    _isSyncingRemote = true;
     try {
       final envelope = await _repository.fetchRemoteCartEnvelope();
       if (envelope != null) {
@@ -719,6 +723,8 @@ class CartNotifier extends ChangeNotifier {
     } catch (e) {
       _actionError = e.toString();
       _safeNotify();
+    } finally {
+      _isSyncingRemote = false;
     }
   }
 
