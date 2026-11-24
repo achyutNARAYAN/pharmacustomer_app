@@ -251,6 +251,8 @@ class CartModel {
   final String? customer;
   final String status; // 'ACTIVE', 'LOCKED', 'ORDER_PLACED', 'ABANDONED'
   final String? allocatedStore;
+  final String? allocatedStoreId;
+  final String? allocatedStoreName;
   final CartDeliveryAddressSnapshot? deliveryAddress;
   final List<CartLineItem> items;
   final int itemsTotalPaise;
@@ -270,6 +272,8 @@ class CartModel {
     this.customer,
     this.status = 'ACTIVE',
     this.allocatedStore,
+    this.allocatedStoreId,
+    this.allocatedStoreName,
     this.deliveryAddress,
     this.items = const [],
     this.itemsTotalPaise = 0,
@@ -342,6 +346,8 @@ class CartModel {
     String? customer,
     String? status,
     String? allocatedStore,
+    String? allocatedStoreId,
+    String? allocatedStoreName,
     CartDeliveryAddressSnapshot? deliveryAddress,
     List<CartLineItem>? items,
     int? itemsTotalPaise,
@@ -361,6 +367,8 @@ class CartModel {
       customer: customer ?? this.customer,
       status: status ?? this.status,
       allocatedStore: allocatedStore ?? this.allocatedStore,
+      allocatedStoreId: allocatedStoreId ?? this.allocatedStoreId,
+      allocatedStoreName: allocatedStoreName ?? this.allocatedStoreName,
       deliveryAddress: deliveryAddress ?? this.deliveryAddress,
       items: items ?? this.items,
       itemsTotalPaise: itemsTotalPaise ?? this.itemsTotalPaise,
@@ -386,7 +394,31 @@ class CartModel {
     final code = map['cartCode'] as String? ?? '';
     final cust = map['customer'] as String?;
     final st = (map['status'] as String? ?? 'ACTIVE').toUpperCase();
-    final store = map['allocatedStore'] as String?;
+
+    String? storeId;
+    String? storeName;
+    final rawStore = map['allocatedStore'];
+    if (rawStore is String) {
+      storeId = rawStore;
+      storeName = rawStore;
+    } else if (rawStore is Map) {
+      storeId = rawStore['_id']?.toString() ??
+          rawStore['id']?.toString() ??
+          rawStore['storeCode']?.toString();
+
+      final business = rawStore['business'];
+      if (business is Map && business['tradeName'] != null) {
+        storeName = business['tradeName']?.toString();
+      } else if (rawStore['tradeName'] != null) {
+        storeName = rawStore['tradeName']?.toString();
+      } else if (rawStore['name'] != null) {
+        storeName = rawStore['name']?.toString();
+      } else if (rawStore['storeName'] != null) {
+        storeName = rawStore['storeName']?.toString();
+      } else {
+        storeName = storeId;
+      }
+    }
 
     CartDeliveryAddressSnapshot? addr;
     if (map['deliveryAddress'] is Map<String, dynamic>) {
@@ -441,7 +473,9 @@ class CartModel {
       cartCode: code,
       customer: cust,
       status: st,
-      allocatedStore: store,
+      allocatedStore: storeName ?? storeId,
+      allocatedStoreId: storeId,
+      allocatedStoreName: storeName,
       deliveryAddress: addr,
       items: items,
       itemsTotalPaise: itemsTotal,
@@ -462,7 +496,9 @@ class CartModel {
         'cartCode': cartCode,
         if (customer != null) 'customer': customer,
         'status': status,
-        'allocatedStore': allocatedStore,
+        'allocatedStore': allocatedStoreId ?? allocatedStore,
+        if (allocatedStoreName != null) 'allocatedStoreName': allocatedStoreName,
+        if (allocatedStoreId != null) 'allocatedStoreId': allocatedStoreId,
         if (deliveryAddress != null) 'deliveryAddress': deliveryAddress!.toJson(),
         'items': items.map((i) => i.toJson()).toList(),
         'itemsTotalPaise': itemsTotalPaise,

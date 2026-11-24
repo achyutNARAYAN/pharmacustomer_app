@@ -10,8 +10,13 @@ import '../orders/repositories/orders_repository.dart';
 import 'order_placed.dart';
 
 class PaymentProcessing extends StatefulWidget {
-  const PaymentProcessing({super.key, required this.amount});
+  const PaymentProcessing({
+    super.key,
+    required this.amount,
+    this.method = 'UPI',
+  });
   final double amount;
+  final String method;
 
   @override
   State<PaymentProcessing> createState() => _PaymentProcessingState();
@@ -33,10 +38,17 @@ class _PaymentProcessingState extends State<PaymentProcessing> {
       final cart = context.read<CartNotifier>();
       final ordersProvider = context.read<OrdersProvider?>();
 
-      // 1. Snapshot the confirmed order details
+      // 1. Snapshot the confirmed order details before clearing
       final orderedItems = List<CartItem>.from(cart.items);
       final totalPaid = widget.amount;
       final totalCount = cart.totalCount > 0 ? cart.totalCount : orderedItems.length;
+      final itemsTotal = cart.itemsTotalPaise > 0
+          ? (cart.itemsTotalPaise / 100.0)
+          : orderedItems.fold<double>(0.0, (sum, i) => sum + i.total);
+      final discount = cart.discountPaise > 0 ? (cart.discountPaise / 100.0) : 0.0;
+      final deliveryFee = (cart.deliveryFeePaise / 100.0);
+      final couponCode = cart.couponCode;
+      final allocatedStore = cart.allocatedStore;
 
       // 2. Record in OrdersProvider
       final orderId = 'AC-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
@@ -63,6 +75,12 @@ class _PaymentProcessingState extends State<PaymentProcessing> {
             orderedItems: orderedItems,
             totalPaid: totalPaid,
             totalCount: totalCount,
+            itemsTotal: itemsTotal,
+            discount: discount,
+            deliveryFee: deliveryFee,
+            couponCode: couponCode,
+            allocatedStore: allocatedStore,
+            paymentMethod: widget.method,
           ),
         ),
       );

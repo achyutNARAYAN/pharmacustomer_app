@@ -196,11 +196,37 @@ class OrderReview extends StatelessWidget {
             ]),
           )),
           const Divider(),
-          _row('Items total', '₹${cart.totalPrice.toStringAsFixed(0)}'),
-          _row('Prescription subsidy & discount', '−₹${(cart.totalPrice - amount).toStringAsFixed(0)}', green: true),
-          _row('Express delivery', 'FREE', green: true),
+          _row(
+            'Items total',
+            cart.remoteCart?.formattedItemsTotal ??
+                '₹${(cart.itemsTotalPaise / 100).toStringAsFixed(0)}',
+          ),
+          if (cart.discountPaise > 0) ...[
+            _row(
+              cart.couponCode != null
+                  ? 'Coupon discount (${cart.couponCode})'
+                  : 'Prescription subsidy & discount',
+              '−${cart.remoteCart?.formattedDiscount ?? "₹${(cart.discountPaise / 100).toStringAsFixed(0)}"}',
+              green: true,
+            ),
+          ],
+          _row(
+            'Express delivery',
+            cart.remoteCart?.formattedDeliveryFee ??
+                (cart.deliveryFeePaise == 0
+                    ? 'FREE'
+                    : '₹${(cart.deliveryFeePaise / 100).toStringAsFixed(0)}'),
+            green: cart.deliveryFeePaise == 0,
+          ),
+          _row('Handling & packaging', 'FREE', green: true),
+          _row('Taxes (GST included)', 'Included'),
           const Divider(height: 24),
-          _row('Total payable', '₹${amount.toStringAsFixed(0)}', bold: true),
+          _row(
+            'Total payable',
+            cart.remoteCart?.formattedTotalPayable ??
+                '₹${amount.toStringAsFixed(0)}',
+            bold: true,
+          ),
         ])),
         const SizedBox(height: 16),
         _card(Row(children: [
@@ -293,7 +319,7 @@ class OrderReview extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute<void>(
-                  builder: (_) => PaymentProcessing(amount: amount),
+                  builder: (_) => PaymentProcessing(amount: amount, method: method),
                 ),
               );
             },

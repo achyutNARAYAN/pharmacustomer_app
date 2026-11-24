@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import '../../../core/errors/failures.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/models/cart_item.dart';
 import '../../../core/storage/key_value_store.dart';
@@ -103,6 +104,10 @@ class CartRepository {
         return CartModel.fromJson(res);
       }
     } catch (e) {
+      if (e is Failure && (e.message.toLowerCase().contains('not found') || (e is NetworkFailure && e.statusCode == 404))) {
+        logger?.info('CartRepository.clearRemoteCart: server cart is already cleared or locked ($e)');
+        return null;
+      }
       logger?.error('CartRepository.clearRemoteCart failed: $e');
       rethrow;
     }

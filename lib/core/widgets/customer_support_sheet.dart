@@ -547,14 +547,7 @@ class _CustomerSupportModalState extends State<_CustomerSupportModal> {
                 return Container(
                   margin: const EdgeInsets.only(bottom: 8),
                   decoration: BoxDecoration(
-                    color: isExpanded ? AppTheme.primaryContainer.withValues(alpha: 0.3) : Colors.white,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: isExpanded
-                          ? AppTheme.primary
-                          : AppTheme.outlineBorder,
-                      width: isExpanded ? 1.4 : 1.0,
-                    ),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.02),
@@ -563,54 +556,67 @@ class _CustomerSupportModalState extends State<_CustomerSupportModal> {
                       ),
                     ],
                   ),
-                  child: Theme(
-                    data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                    child: ExpansionTile(
-                      key: Key('faq_$index'),
-                      initiallyExpanded: isExpanded,
-                      onExpansionChanged: (val) {
-                        setState(() {
-                          _expandedFaqIndex = val ? index : null;
-                        });
-                      },
-                      tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-                      childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-                      leading: Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(icon, color: AppTheme.primary, size: 18),
+                  child: Material(
+                    color: isExpanded ? AppTheme.primaryContainer.withValues(alpha: 0.3) : Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(
+                        color: isExpanded
+                            ? AppTheme.primary
+                            : AppTheme.outlineBorder,
+                        width: isExpanded ? 1.4 : 1.0,
                       ),
-                      title: Text(
-                        faq['q'] as String,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: isExpanded ? AppTheme.primaryDark : AppTheme.text,
-                        ),
-                      ),
-                      children: [
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(12),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Theme(
+                      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                      child: ExpansionTile(
+                        key: Key('faq_$index'),
+                        initiallyExpanded: isExpanded,
+                        onExpansionChanged: (val) {
+                          setState(() {
+                            _expandedFaqIndex = val ? index : null;
+                          });
+                        },
+                        tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                        childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+                        leading: Container(
+                          width: 34,
+                          height: 34,
                           decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppTheme.outlineBorder),
+                            color: AppTheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Text(
-                            faq['a'] as String,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              height: 1.5,
-                              color: AppTheme.textSecondary,
+                          child: Icon(icon, color: AppTheme.primary, size: 18),
+                        ),
+                        title: Text(
+                          faq['q'] as String,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: isExpanded ? AppTheme.primaryDark : AppTheme.text,
+                          ),
+                        ),
+                        children: [
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppTheme.outlineBorder),
+                            ),
+                            child: Text(
+                              faq['a'] as String,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                height: 1.5,
+                                color: AppTheme.textSecondary,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 );

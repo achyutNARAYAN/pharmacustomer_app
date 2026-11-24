@@ -93,7 +93,9 @@ class _PaymentState extends State<Payment> {
                       child: Text(
                         hasCoupon
                             ? 'Coupon \'${cart.couponCode}\' applied · Saved ₹${(cart.discountPaise / 100).toStringAsFixed(0)}'
-                            : 'subsidy applied · You save ₹161',
+                            : (cart.discountPaise > 0
+                                ? 'Saved ₹${(cart.discountPaise / 100).toStringAsFixed(0)} on this order'
+                                : 'Verified order · Ready for checkout'),
                         style: const TextStyle(color: AppTheme.primaryDark, fontWeight: FontWeight.w700),
                       ),
                     ),
