@@ -6,11 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme.dart';
-import '../auth/providers/auth_provider.dart';
 import '../../core/providers/cart_notifier.dart';
 import '../../core/providers/profile_notifier.dart';
-import '../../core/services/api_service.dart';
-import '../prescriptions/providers/prescription_provider.dart';
 import '../prescriptions/repositories/prescription_repository.dart';
 import '../orders/providers/orders_provider.dart';
 import 'home.dart';

@@ -5,6 +5,8 @@ import '../../core/models/cart_item.dart';
 import '../../core/providers/cart_notifier.dart';
 import '../../core/providers/profile_notifier.dart';
 import '../../core/theme.dart';
+import '../orders/models/order_model.dart';
+import '../orders/widgets/order_timeline_stepper.dart';
 import '../profile/providers/customer_address_provider.dart';
 import 'tax_invoice.dart';
 import 'live_tracking.dart';
@@ -53,14 +55,11 @@ class OrderPlaced extends StatelessWidget {
     } catch (_) {}
 
     final activeAddress = addressProvider?.selectedAddress ?? addressProvider?.defaultAddress;
-    final customerName = activeAddress?.contactName ??
-        (profile.name.isNotEmpty ? profile.name : 'Customer');
     final deliveryAddress = activeAddress != null
         ? activeAddress.displayDetails
         : ((profile.address.isNotEmpty && profile.address != 'Set delivery location')
             ? profile.address
             : 'Primary Delivery Location');
-    final addressTypeLabel = activeAddress?.typeKey ?? 'Home';
 
     final items = orderedItems ?? cart.items;
     final count = totalCount ??
@@ -163,6 +162,11 @@ class OrderPlaced extends StatelessWidget {
                     ),
                   ),
                 ],
+                const SizedBox(height: 14),
+                const OrderTimelineStepper(
+                  status: OrderStatus.ORDER_PLACED,
+                  isCompact: true,
+                ),
               ],
             ),
           ),

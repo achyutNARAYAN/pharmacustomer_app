@@ -26,8 +26,11 @@ class LiveTracking extends StatefulWidget {
 class _LiveTrackingState extends State<LiveTracking> {
   GoogleMapController? _mapController;
   DeliveryTrackingModel? _tracking;
+  OrderModel? _orderModel;
   bool _isLoading = true;
   Timer? _pollTimer;
+  Timer? _countdownTimer;
+  Duration _remainingSla = Duration.zero;
   List<LatLng>? _cachedRoutePoints;
   LatLng? _cachedDestination;
 
@@ -35,20 +38,82 @@ class _LiveTrackingState extends State<LiveTracking> {
   void initState() {
     super.initState();
     _fetchTracking();
-
-    // Periodic live polling (every 15 seconds) to sync real-time driver movement & ETA from backend
-    _pollTimer = Timer.periodic(const Duration(seconds: 15), (_) {
-      if (mounted) {
-        _fetchTracking(silent: true);
-      }
-    });
   }
 
   @override
   void dispose() {
     _pollTimer?.cancel();
+    _countdownTimer?.cancel();
     _mapController?.dispose();
     super.dispose();
+  }
+
+  void _startOrUpdateTimers() {
+    // 1. Smart Polling
+    final order = _orderModel;
+    if (order != null) {
+      if (order.isPollingActive) {
+        final intervalSec = order.pollIntervalSeconds ?? 6;
+        _pollTimer?.cancel();
+        _pollTimer = Timer.periodic(Duration(seconds: intervalSec), (_) async {
+          if (!mounted) return;
+          await _fetchTracking(silent: true);
+        });
+      } else {
+        // Automatically stop polling when in terminal state (pollIntervalSeconds is null / inactive)
+        _pollTimer?.cancel();
+        _pollTimer = null;
+      }
+    } else {
+      // If order not yet loaded, retry polling every 6 seconds
+      _pollTimer ??= Timer.periodic(const Duration(seconds: 6), (_) async {
+        if (!mounted) return;
+        await _fetchTracking(silent: true);
+      });
+    }
+
+    // 2. 15-Minute Chemist Acceptance Countdown
+    _countdownTimer?.cancel();
+    _countdownTimer = null;
+
+    if (order?.status == OrderStatus.ORDER_PLACED && order?.storeAcceptanceDeadlineAt != null) {
+      final deadline = order!.storeAcceptanceDeadlineAt!;
+      final now = DateTime.now();
+      final diff = deadline.difference(now);
+      if (diff.isNegative || diff == Duration.zero) {
+        _remainingSla = Duration.zero;
+      } else {
+        _remainingSla = diff;
+        _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
+          if (!mounted) {
+            timer.cancel();
+            return;
+          }
+          final currentDiff = deadline.difference(DateTime.now());
+          if (currentDiff.isNegative || currentDiff == Duration.zero) {
+            timer.cancel();
+            if (mounted) {
+              setState(() => _remainingSla = Duration.zero);
+              // Trigger immediate fetch upon SLA timeout (00:00) to catch backend status change (rejection/timeout)
+              await _fetchTracking(silent: true);
+            }
+          } else {
+            if (mounted) {
+              setState(() => _remainingSla = currentDiff);
+            }
+          }
+        });
+      }
+    } else {
+      _remainingSla = Duration.zero;
+    }
+  }
+
+  String _formatDuration(Duration d) {
+    if (d.isNegative) return '00:00';
+    final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
   }
 
   Future<void> _fetchTracking({bool silent = false}) async {
@@ -134,6 +199,19 @@ class _LiveTrackingState extends State<LiveTracking> {
     final fallbackItems = cart.items.map((i) => i.name).toList();
 
     Map<String, dynamic>? backendData;
+    OrderModel? fetchedOrder;
+    if (activeOrderId != null && ApiService.token != null) {
+      try {
+        final res = await ApiService.getOrderDetails(activeOrderId);
+        if (res is Map<String, dynamic>) {
+          backendData = res.containsKey('data') && res['data'] is Map<String, dynamic>
+              ? res['data'] as Map<String, dynamic>
+              : res;
+          fetchedOrder = OrderModel.fromJson(backendData);
+        }
+      } catch (_) {}
+    }
+
     if (!mounted) return;
 
     // Resolve true real-world coordinates for the delivery address
@@ -179,9 +257,14 @@ class _LiveTrackingState extends State<LiveTracking> {
 
     setState(() {
       _tracking = resolvedTracking;
+      _orderModel = fetchedOrder ??
+          (activeOrderId != null
+              ? ordersProvider?.orders.where((o) => o.orderId == activeOrderId).firstOrNull
+              : null);
       _isLoading = false;
     });
 
+    _startOrUpdateTimers();
     WidgetsBinding.instance.addPostFrameCallback((_) => _fitMapBounds());
   }
 
@@ -435,6 +518,168 @@ class _LiveTrackingState extends State<LiveTracking> {
                       ),
                     ),
                     const SizedBox(height: 14),
+
+                    // ── 15-Minute Chemist Acceptance Countdown SLA Banner ──
+                    if (_orderModel?.status == OrderStatus.ORDER_PLACED && _remainingSla > Duration.zero) ...[
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFFBEB),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFF59E0B), width: 1.2),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF59E0B),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.timer_outlined, color: Colors.white, size: 20),
+                            ),
+                            const SizedBox(width: 14),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'PHARMACY ACCEPTANCE SLA',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5,
+                                      color: Color(0xFFB45309),
+                                    ),
+                                  ),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    'Chemist verifying stock',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppTheme.text,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFEF3C7),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: const Color(0xFFF59E0B)),
+                              ),
+                              child: Text(
+                                _formatDuration(_remainingSla),
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'monospace',
+                                  color: Color(0xFFB45309),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
+                    // ── Real Doorstep Delivery OTP (Backend verified) ──
+                    if (tracking.handoverOtp.isNotEmpty) ...[
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE0F2F1),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppTheme.primary, width: 1.5),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primary,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.key_rounded, color: Colors.white, size: 20),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'DOORSTEP DELIVERY OTP',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5,
+                                      color: AppTheme.primaryDark,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    tracking.handoverOtp,
+                                    style: const TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 4,
+                                      color: AppTheme.primaryDark,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Text(
+                              'Share with rider',
+                              style: TextStyle(fontSize: 11, color: AppTheme.mutedText),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
+                    // ── Terminal Order State Alert (Cancelled / Rejected / Delivery Failed) ──
+                    if (_orderModel?.status.isTerminal == true) ...[
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.red.shade200),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              _orderModel?.status == OrderStatus.STORE_REJECTED
+                                  ? Icons.error_outline_rounded
+                                  : Icons.cancel_rounded,
+                              color: Colors.red.shade700,
+                              size: 22,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                _orderModel?.rejectionReason ??
+                                    _orderModel?.cancellationReason ??
+                                    _orderModel?.status.displayTitle ??
+                                    'Order Cancelled',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.red.shade900,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
 
                     // Driver Profile & Contact (Backend driven)
                     Row(

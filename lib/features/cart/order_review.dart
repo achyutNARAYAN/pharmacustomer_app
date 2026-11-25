@@ -34,14 +34,11 @@ class OrderReview extends StatelessWidget {
     } catch (_) {}
 
     final activeAddress = addressProvider?.selectedAddress ?? addressProvider?.defaultAddress;
-    final customerName = activeAddress?.contactName ??
-        (profile.name.isNotEmpty ? profile.name : 'Customer');
     final deliveryAddress = activeAddress != null
         ? activeAddress.displayDetails
         : ((profile.address.isNotEmpty && profile.address != 'Set delivery location')
             ? profile.address
             : 'Primary Delivery Location');
-    final addressTypeLabel = activeAddress?.typeKey ?? 'Home';
 
     final pinCode = activeAddress?.pinCode ??
         RegExp(r'\b[1-9][0-9]{5}\b').firstMatch(deliveryAddress)?.group(0);

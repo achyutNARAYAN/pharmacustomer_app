@@ -847,4 +847,70 @@ class ApiService {
     }
     return await post(ApiConstants.cartCheckout, body: body);
   }
+
+  /// 12. Place Order (Convert Locked Cart into Order)
+  /// Endpoint: POST /api/v1/orders
+  /// Parameters:
+  /// - [paymentMethod]: Must be 'ONLINE' or 'COD'
+  /// - [customerNote]: Optional instructions (max 250 characters)
+  /// - [cartId]: Optional 24-hex Mongo ID of cart
+  static Future<dynamic> placeOrder({
+    required String paymentMethod,
+    String? customerNote,
+    String? cartId,
+  }) async {
+    final body = <String, dynamic>{
+      'paymentMethod': paymentMethod.toUpperCase(),
+    };
+    if (customerNote != null && customerNote.trim().isNotEmpty) {
+      body['customerNote'] = customerNote.trim();
+    }
+    if (cartId != null && cartId.trim().isNotEmpty) {
+      body['cartId'] = cartId.trim();
+    }
+    return await post(ApiConstants.orders, body: body);
+  }
+
+  /// 13. List Customer Orders (Order History)
+  /// Endpoint: GET /api/v1/orders
+  static Future<dynamic> getOrders({
+    int page = 1,
+    int limit = 20,
+    String? status,
+    String? search,
+  }) async {
+    final queryParams = <String, dynamic>{
+      'page': page,
+      'limit': limit,
+    };
+    if (status != null && status.isNotEmpty && status.toUpperCase() != 'ALL') {
+      queryParams['status'] = status.toUpperCase();
+    }
+    if (search != null && search.trim().isNotEmpty) {
+      queryParams['search'] = search.trim();
+    }
+    return await get(ApiConstants.orders, queryParameters: queryParams);
+  }
+
+  /// 14. Get Order Detail & Live Tracking
+  /// Endpoint: GET /api/v1/orders/:orderId (supports Mongo _id or ORD-2026-0001 code)
+  static Future<dynamic> getOrderDetails(String orderId) async {
+    return await get(ApiConstants.orderDetail(orderId));
+  }
+
+  /// 15. Cancel Order (Customer Self-Service before packing)
+  /// Endpoint: POST /api/v1/orders/:orderId/cancel
+  static Future<dynamic> cancelOrder({
+    required String orderId,
+    required String reason,
+    String? note,
+  }) async {
+    final body = <String, dynamic>{
+      'reason': reason,
+    };
+    if (note != null && note.trim().isNotEmpty) {
+      body['note'] = note.trim();
+    }
+    return await post(ApiConstants.cancelOrder(orderId), body: body);
+  }
 }

@@ -3,8 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/models/cart_item.dart';
+import '../../core/errors/failures.dart';
 import '../../core/providers/cart_notifier.dart';
+import '../../core/services/api_service.dart';
 import '../../core/theme.dart';
+import '../orders/providers/orders_provider.dart';
 import 'order_placed.dart';
 
 class PaymentProcessing extends StatefulWidget {
@@ -21,42 +24,71 @@ class PaymentProcessing extends StatefulWidget {
 }
 
 class _PaymentProcessingState extends State<PaymentProcessing> {
-  Timer? _timer;
+  bool _isProcessing = true;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _processPayment();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _processPayment();
+    });
   }
 
-  void _processPayment() {
-    _timer = Timer(const Duration(milliseconds: 2400), () {
+  Future<void> _processPayment() async {
+    setState(() {
+      _isProcessing = true;
+      _errorMessage = null;
+    });
+
+    final cart = context.read<CartNotifier>();
+    final ordersProvider = context.read<OrdersProvider>();
+
+    // Snapshot current cart state for confirmation display
+    final orderedItems = List<CartItem>.from(cart.items);
+    final totalPaid = widget.amount;
+    final totalCount = cart.totalCount > 0 ? cart.totalCount : orderedItems.length;
+    final itemsTotal = cart.itemsTotalPaise > 0
+        ? (cart.itemsTotalPaise / 100.0)
+        : orderedItems.fold<double>(0.0, (sum, i) => sum + i.total);
+    final discount = cart.discountPaise > 0 ? (cart.discountPaise / 100.0) : 0.0;
+    final deliveryFee = (cart.deliveryFeePaise / 100.0);
+    final couponCode = cart.couponCode;
+    final allocatedStore = cart.allocatedStore;
+
+    final isCod = widget.method.toUpperCase().contains('COD') ||
+        widget.method.toUpperCase().contains('CASH');
+    final paymentMethodParam = isCod ? 'COD' : 'ONLINE';
+
+    try {
+      // Minimum visual handshake delay for banking security feel
+      await Future<void>.delayed(const Duration(milliseconds: 1600));
       if (!mounted) return;
 
-      final cart = context.read<CartNotifier>();
+      OrderModel? placedOrder;
+      if (ApiService.token != null) {
+        placedOrder = await ordersProvider.placeOrder(
+          paymentMethod: paymentMethodParam,
+        );
+      }
 
-      // 1. Snapshot the confirmed order details before clearing
-      final orderedItems = List<CartItem>.from(cart.items);
-      final totalPaid = widget.amount;
-      final totalCount = cart.totalCount > 0 ? cart.totalCount : orderedItems.length;
-      final itemsTotal = cart.itemsTotalPaise > 0
-          ? (cart.itemsTotalPaise / 100.0)
-          : orderedItems.fold<double>(0.0, (sum, i) => sum + i.total);
-      final discount = cart.discountPaise > 0 ? (cart.discountPaise / 100.0) : 0.0;
-      final deliveryFee = (cart.deliveryFeePaise / 100.0);
-      final couponCode = cart.couponCode;
-      final allocatedStore = cart.allocatedStore;
+      if (!mounted) return;
 
-      // 2. Atomically clear the active cart (remote API DELETE + local persistence wipe)
+      // Atomically clear active cart once order is confirmed by server
       cart.clearAll();
 
-      // 3. Auto-transition to Order Placed confirmation with the confirmed snapshot
+      final resolvedOrderId = placedOrder?.orderCode.isNotEmpty == true
+          ? placedOrder!.orderCode
+          : placedOrder?.id;
+
+      // Navigate to order confirmation
       Navigator.pushReplacement(
         context,
         MaterialPageRoute<void>(
           builder: (_) => OrderPlaced(
+            orderId: resolvedOrderId,
             orderedItems: orderedItems,
-            totalPaid: totalPaid,
+            totalPaid: placedOrder != null ? (placedOrder.totalPayablePaise / 100.0) : totalPaid,
             totalCount: totalCount,
             itemsTotal: itemsTotal,
             discount: discount,
@@ -67,17 +99,18 @@ class _PaymentProcessingState extends State<PaymentProcessing> {
           ),
         ),
       );
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isProcessing = false;
+        _errorMessage = e is Failure ? e.message : e.toString().replaceFirst('Exception: ', '');
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    backgroundColor: AppTheme.background,
     body: SafeArea(
       child: Column(
         children: [
@@ -96,19 +129,66 @@ class _PaymentProcessingState extends State<PaymentProcessing> {
             ),
           ),
           const Spacer(),
-          const CircularProgressIndicator(strokeWidth: 3),
-          const SizedBox(height: 28),
-          const Text(
-            'Securing Payment &\nProcessing Order…',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 23,
-              fontWeight: FontWeight.bold,
-              height: 1.2,
+          if (_isProcessing) ...[
+            const CircularProgressIndicator(strokeWidth: 3),
+            const SizedBox(height: 28),
+            const Text(
+              'Securing Payment &\nConfirming Order…',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 23,
+                fontWeight: FontWeight.bold,
+                height: 1.2,
+              ),
             ),
-          ),
-          const SizedBox(height: 10),
-          const Text('Please keep this screen open while we confirm with your bank.'),
+            const SizedBox(height: 10),
+            const Text('Please keep this screen open while we connect with pharmacy.'),
+          ] else ...[
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.error_outline_rounded, color: Colors.red.shade700, size: 36),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Order Placement Failed',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 21,
+                fontWeight: FontWeight.bold,
+                color: Colors.red,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                _errorMessage ?? 'An unexpected network error occurred while placing your order.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppTheme.textSecondary, height: 1.4),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Back to Review'),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton.icon(
+                  onPressed: _processPayment,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Retry Placement'),
+                ),
+              ],
+            ),
+          ],
           const Spacer(),
           Container(
             margin: const EdgeInsets.all(20),

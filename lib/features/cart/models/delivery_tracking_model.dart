@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../profile/models/customer_address.dart';
 
@@ -250,11 +249,12 @@ class DeliveryTrackingModel {
     final driverVehicle = driverMap['vehicle'] as String? ?? 'pharmaCustomer Express · Hero Electric';
     final driverPhone = driverMap['phone'] as String? ?? '+919876543210';
 
-    // 8. Handover OTP
-    final handoverOtp = data['handoverOtp'] as String? ??
+    // 8. Handover OTP (matches MDP backend deliveryOtp)
+    final handoverOtp = data['deliveryOtp'] as String? ??
+        data['handoverOtp'] as String? ??
         data['otp'] as String? ??
         data['verificationCode'] as String? ??
-        '${(math.Random(resolvedOrderId.hashCode).nextInt(9000) + 1000)}';
+        '';
 
     // 9. Items Count & Names
     final itemCount = (data['itemCount'] as num?)?.toInt() ??

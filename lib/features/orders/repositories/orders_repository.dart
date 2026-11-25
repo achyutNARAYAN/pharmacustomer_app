@@ -1,109 +1,9 @@
 import 'dart:convert';
-import '../../../core/models/cart_item.dart';
+import '../../../core/services/api_service.dart';
 import '../../../core/storage/key_value_store.dart';
+import '../models/order_model.dart';
 
-enum OrderStatus {
-  placed,
-  confirmed,
-  processing,
-  outForDelivery,
-  delivered,
-  cancelled,
-  rejected,
-  refunded,
-}
-
-class OrderItem {
-  final String orderId;
-  final OrderStatus status;
-  final int totalPaise;
-  final int itemCount;
-  final DateTime createdAt;
-  final List<CartItem>? items;
-
-  const OrderItem({
-    required this.orderId,
-    required this.status,
-    required this.totalPaise,
-    required this.itemCount,
-    required this.createdAt,
-    this.items,
-  });
-
-  bool get isActive =>
-      status != OrderStatus.delivered &&
-      status != OrderStatus.cancelled &&
-      status != OrderStatus.rejected &&
-      status != OrderStatus.refunded;
-
-  Map<String, dynamic> toJson() => {
-        'orderId': orderId,
-        'status': status.name,
-        'totalPaise': totalPaise,
-        'itemCount': itemCount,
-        'createdAt': createdAt.toUtc().toIso8601String(),
-        if (items != null)
-          'items': items!.map((i) => {
-            'id': i.id,
-            'name': i.name,
-            'pack': i.pack,
-            'price': i.price,
-            'quantity': i.quantity,
-            'requiresPrescription': i.requiresPrescription,
-          }).toList(),
-      };
-
-  static OrderItem? fromJson(Map<String, dynamic> json) {
-    final orderId = json['orderId'];
-    final statusName = json['status'];
-    final totalPaise = json['totalPaise'];
-    final itemCount = json['itemCount'];
-    final createdAtRaw = json['createdAt'];
-
-    if (orderId is! String ||
-        statusName is! String ||
-        totalPaise is! int ||
-        itemCount is! int ||
-        createdAtRaw is! String) {
-      return null;
-    }
-
-    final createdAt = DateTime.tryParse(createdAtRaw);
-    if (createdAt == null) return null;
-
-    final status = OrderStatus.values.firstWhere(
-      (s) => s.name == statusName,
-      orElse: () => OrderStatus.placed,
-    );
-
-    final rawItems = json['items'];
-    List<CartItem>? items;
-    if (rawItems is List) {
-      items = rawItems.map((itemJson) {
-        if (itemJson is Map<String, dynamic>) {
-          return CartItem(
-            id: itemJson['id']?.toString() ?? '',
-            name: itemJson['name']?.toString() ?? 'Medicine',
-            pack: itemJson['pack']?.toString() ?? '1 Unit',
-            price: (itemJson['price'] as num?)?.toDouble() ?? 0.0,
-            quantity: (itemJson['quantity'] as num?)?.toInt() ?? 1,
-            requiresPrescription: itemJson['requiresPrescription'] == true,
-          );
-        }
-        return null;
-      }).whereType<CartItem>().toList();
-    }
-
-    return OrderItem(
-      orderId: orderId,
-      status: status,
-      totalPaise: totalPaise,
-      itemCount: itemCount,
-      createdAt: createdAt,
-      items: items,
-    );
-  }
-}
+export '../models/order_model.dart';
 
 class OrdersRepository {
   final KeyValueStore store;
@@ -114,7 +14,8 @@ class OrdersRepository {
 
   String keyFor(String userId) => 'orders.$userId';
 
-  Future<List<OrderItem>> hydrate(String userId) async {
+  /// 1. Hydrate cached orders from local device storage
+  Future<List<OrderModel>> hydrate(String userId) async {
     try {
       final key = keyFor(userId);
       final raw = await store.read(key);
@@ -130,23 +31,13 @@ class OrdersRepository {
       final rawList = data['orders'];
       if (rawList is! List) return [];
 
-      final orders = <OrderItem>[];
-      bool hadLegacyMock = false;
+      final orders = <OrderModel>[];
       for (final item in rawList) {
         if (item is Map<String, dynamic>) {
-          final o = OrderItem.fromJson(item);
-          if (o != null) {
-            // Discard legacy mocked orders generated with local AC- prefix
-            if (o.orderId.startsWith('AC-')) {
-              hadLegacyMock = true;
-            } else {
-              orders.add(o);
-            }
-          }
+          try {
+            orders.add(OrderModel.fromJson(item));
+          } catch (_) {}
         }
-      }
-      if (hadLegacyMock) {
-        schedulePersist(userId, orders);
       }
       return orders;
     } catch (_) {
@@ -154,7 +45,8 @@ class OrdersRepository {
     }
   }
 
-  void schedulePersist(String userId, List<OrderItem> orders) {
+  /// 2. Persist orders to local disk
+  void schedulePersist(String userId, List<OrderModel> orders) {
     final key = keyFor(userId);
     store.write(
       key,
@@ -162,6 +54,94 @@ class OrdersRepository {
         'orders': orders.take(20).map((o) => o.toJson()).toList(),
       }),
     );
+  }
+
+  /// 3. Fetch remote orders from production API (GET /api/v1/orders)
+  Future<List<OrderModel>> fetchRemoteOrders({
+    int page = 1,
+    int limit = 20,
+    String? status,
+    String? search,
+  }) async {
+    try {
+      final res = await ApiService.getOrders(
+        page: page,
+        limit: limit,
+        status: status,
+        search: search,
+      );
+
+      final List<dynamic> list;
+      if (res is List) {
+        list = res;
+      } else if (res is Map<String, dynamic> && res['data'] is List) {
+        list = res['data'] as List;
+      } else {
+        return [];
+      }
+
+      final orders = <OrderModel>[];
+      for (final item in list) {
+        if (item is Map<String, dynamic>) {
+          try {
+            orders.add(OrderModel.fromJson(item));
+          } catch (_) {}
+        }
+      }
+      return orders;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// 4. Fetch specific order details (GET /api/v1/orders/:orderId)
+  Future<OrderModel?> fetchOrderDetails(String orderId) async {
+    try {
+      final res = await ApiService.getOrderDetails(orderId);
+      if (res is Map<String, dynamic>) {
+        final data = res.containsKey('data') && res['data'] is Map<String, dynamic>
+            ? res['data'] as Map<String, dynamic>
+            : res;
+        return OrderModel.fromJson(data);
+      }
+      return null;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// 5. Place real order (POST /api/v1/orders)
+  Future<OrderModel> placeOrder({
+    required String paymentMethod,
+    String? customerNote,
+    String? cartId,
+  }) async {
+    final res = await ApiService.placeOrder(
+      paymentMethod: paymentMethod,
+      customerNote: customerNote,
+      cartId: cartId,
+    );
+    if (res is Map<String, dynamic>) {
+      final data = res.containsKey('data') && res['data'] is Map<String, dynamic>
+          ? res['data'] as Map<String, dynamic>
+          : res;
+      return OrderModel.fromJson(data);
+    }
+    throw Exception('Invalid order response from server');
+  }
+
+  /// 6. Cancel order (POST /api/v1/orders/:orderId/cancel)
+  Future<bool> cancelOrder({
+    required String orderId,
+    required String reason,
+    String? note,
+  }) async {
+    final res = await ApiService.cancelOrder(
+      orderId: orderId,
+      reason: reason,
+      note: note,
+    );
+    return res != null;
   }
 
   Future<void> clearOrders(String userId) async {

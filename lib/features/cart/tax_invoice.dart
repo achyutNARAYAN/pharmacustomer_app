@@ -255,10 +255,20 @@ class TaxInvoice extends StatelessWidget {
 
     final effectiveDate = orderDate ?? latestOrder?.createdAt ?? DateTime.now();
 
+    final orderItems = latestOrder?.items;
     List<CartItem> effectiveItems = (items != null && items!.isNotEmpty)
         ? items!
-        : (latestOrder?.items != null && latestOrder!.items!.isNotEmpty
-            ? latestOrder!.items!
+        : (orderItems != null && orderItems.isNotEmpty
+            ? orderItems
+                .map((i) => CartItem(
+                      id: i.medicineId,
+                      name: i.name,
+                      pack: i.pack,
+                      price: i.price,
+                      quantity: i.quantity,
+                      requiresPrescription: i.isPrescriptionRequired,
+                    ))
+                .toList()
             : cart.items);
 
     final double calcItemsTotal = itemsTotal ??
