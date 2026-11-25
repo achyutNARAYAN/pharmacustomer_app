@@ -109,12 +109,14 @@ class DeliveryTrackingModel {
         data['id'] as String? ??
         data['_id'] as String? ??
         fallbackOrderId ??
-        '8819';
-    final resolvedOrderId = rawId.startsWith('AC-')
-        ? rawId.replaceFirst('AC-', '')
-        : rawId.length > 6
-            ? rawId.substring(rawId.length - 4)
-            : rawId;
+        '';
+    final resolvedOrderId = rawId.isNotEmpty
+        ? (rawId.startsWith('AC-')
+            ? rawId.replaceFirst('AC-', '')
+            : rawId.length > 6
+                ? rawId.substring(rawId.length - 4)
+                : rawId)
+        : '';
 
     // 2. Status resolution
     final rawStatus = (data['status'] as String? ?? 'OUT_FOR_DELIVERY').toUpperCase();

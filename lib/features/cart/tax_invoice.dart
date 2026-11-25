@@ -247,13 +247,11 @@ class TaxInvoice extends StatelessWidget {
         ? ordersProvider.orders.first
         : null;
 
-    final rawOrderId = orderId ??
-        latestOrder?.orderId ??
-        'INV-${DateTime.now().year}-${(DateTime.now().millisecondsSinceEpoch % 100000).toString().padLeft(5, '0')}';
+    final rawOrderId = orderId ?? latestOrder?.orderId ?? '';
 
-    final invoiceNumber = rawOrderId.startsWith('AC-')
-        ? rawOrderId
-        : 'AC-$rawOrderId';
+    final invoiceNumber = rawOrderId.isNotEmpty
+        ? (rawOrderId.startsWith('AC-') ? rawOrderId : 'AC-$rawOrderId')
+        : 'N/A';
 
     final effectiveDate = orderDate ?? latestOrder?.createdAt ?? DateTime.now();
 

@@ -68,6 +68,14 @@ class OrdersProvider extends ChangeNotifier {
     await init();
   }
 
+  Future<void> clearAll() async {
+    _orders.clear();
+    if (_repository != null && _userId != null) {
+      await _repository!.clearOrders(_userId!);
+    }
+    _safeNotify();
+  }
+
   void reset() {
     _orders.clear();
     _status = LoadStatus.ready;

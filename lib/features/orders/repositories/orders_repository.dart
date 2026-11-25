@@ -131,11 +131,22 @@ class OrdersRepository {
       if (rawList is! List) return [];
 
       final orders = <OrderItem>[];
+      bool hadLegacyMock = false;
       for (final item in rawList) {
         if (item is Map<String, dynamic>) {
           final o = OrderItem.fromJson(item);
-          if (o != null) orders.add(o);
+          if (o != null) {
+            // Discard legacy mocked orders generated with local AC- prefix
+            if (o.orderId.startsWith('AC-')) {
+              hadLegacyMock = true;
+            } else {
+              orders.add(o);
+            }
+          }
         }
+      }
+      if (hadLegacyMock) {
+        schedulePersist(userId, orders);
       }
       return orders;
     } catch (_) {
@@ -151,6 +162,10 @@ class OrdersRepository {
         'orders': orders.take(20).map((o) => o.toJson()).toList(),
       }),
     );
+  }
+
+  Future<void> clearOrders(String userId) async {
+    await store.remove(keyFor(userId));
   }
 
   Future<void> wipeUser(String userId) async {

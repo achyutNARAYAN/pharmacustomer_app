@@ -5,8 +5,6 @@ import 'package:provider/provider.dart';
 import '../../core/models/cart_item.dart';
 import '../../core/providers/cart_notifier.dart';
 import '../../core/theme.dart';
-import '../orders/providers/orders_provider.dart';
-import '../orders/repositories/orders_repository.dart';
 import 'order_placed.dart';
 
 class PaymentProcessing extends StatefulWidget {
@@ -36,7 +34,6 @@ class _PaymentProcessingState extends State<PaymentProcessing> {
       if (!mounted) return;
 
       final cart = context.read<CartNotifier>();
-      final ordersProvider = context.read<OrdersProvider?>();
 
       // 1. Snapshot the confirmed order details before clearing
       final orderedItems = List<CartItem>.from(cart.items);
@@ -50,28 +47,14 @@ class _PaymentProcessingState extends State<PaymentProcessing> {
       final couponCode = cart.couponCode;
       final allocatedStore = cart.allocatedStore;
 
-      // 2. Record in OrdersProvider
-      final orderId = 'AC-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
-      ordersProvider?.addOrder(
-        OrderItem(
-          orderId: orderId,
-          status: OrderStatus.placed,
-          totalPaise: (totalPaid * 100).round(),
-          itemCount: totalCount,
-          createdAt: DateTime.now(),
-          items: orderedItems,
-        ),
-      );
-
-      // 3. Atomically clear the active cart (remote API DELETE + local persistence wipe)
+      // 2. Atomically clear the active cart (remote API DELETE + local persistence wipe)
       cart.clearAll();
 
-      // 4. Auto-transition to Order Placed confirmation with the confirmed snapshot
+      // 3. Auto-transition to Order Placed confirmation with the confirmed snapshot
       Navigator.pushReplacement(
         context,
         MaterialPageRoute<void>(
           builder: (_) => OrderPlaced(
-            orderId: orderId,
             orderedItems: orderedItems,
             totalPaid: totalPaid,
             totalCount: totalCount,
