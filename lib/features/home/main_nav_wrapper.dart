@@ -123,7 +123,7 @@ class _MainNavWrapperState extends State<MainNavWrapper> {
             },
           ),
           Search(onBack: () => setState(() => _currentIndex = 0)),
-          const OrderHistory(),
+          OrderHistory(isActiveTab: _currentIndex == 2),
           PrescriptionVault(
             patientName: profile.name,
             profileImagePath: profile.profileImagePath,

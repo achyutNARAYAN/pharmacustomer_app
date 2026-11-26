@@ -23,6 +23,7 @@ class CartNotifier extends ChangeNotifier {
   // Local fallback items & prescriptions (offline/guest)
   final Map<String, CartItem> _localItems = {};
   final List<String> _localPrescriptionIds = [];
+  String? _attachedPrescriptionName;
 
   // Authoritative remote cart state from MDP Cart & Checkout API
   CartModel? _remoteCart;
@@ -148,6 +149,16 @@ class CartNotifier extends ChangeNotifier {
     }
     for (final id in _localPrescriptionIds) {
       if (id.trim().isNotEmpty) return id.trim();
+    }
+    return null;
+  }
+
+  String? get attachedPrescriptionName {
+    if (_attachedPrescriptionName != null && _attachedPrescriptionName!.trim().isNotEmpty) {
+      return _attachedPrescriptionName!.trim();
+    }
+    if (_remoteCart?.prescriptionDoctorName != null && _remoteCart!.prescriptionDoctorName!.trim().isNotEmpty) {
+      return _remoteCart!.prescriptionDoctorName!.trim();
     }
     return null;
   }
@@ -360,6 +371,25 @@ class CartNotifier extends ChangeNotifier {
       _schedulePersist();
       _safeNotify();
       return;
+    }
+
+    // If backend returns null prescription (happens on qty PATCH / other partial updates),
+    // preserve the previously attached prescription so the cart never accidentally loses it.
+    final incomingRxId = effectiveCart.prescriptionId;
+    final hadRxBefore = (_remoteCart?.prescriptionId != null && _remoteCart!.prescriptionId!.isNotEmpty) ||
+        _localPrescriptionIds.any((id) => id.trim().isNotEmpty);
+    final backendDroppedRx = (incomingRxId == null || incomingRxId.isEmpty) && hadRxBefore && !_userExplicitlyDetachedRx;
+
+    if (backendDroppedRx) {
+      // Rehydrate the previously known prescription ID back into the incoming cart
+      final preservedRxId = _remoteCart?.prescriptionId ?? _localPrescriptionIds.firstWhere((id) => id.trim().isNotEmpty, orElse: () => '');
+      if (preservedRxId.isNotEmpty) {
+        effectiveCart = effectiveCart.copyWith(
+          prescriptionId: preservedRxId,
+          prescriptionDoctorName: _attachedPrescriptionName ?? _remoteCart?.prescriptionDoctorName,
+        );
+        debugPrint('[CartNotifier] Preserved prescriptionId=$preservedRxId (backend returned null on partial update)');
+      }
     }
 
     _remoteCart = effectiveCart;
@@ -845,18 +875,24 @@ class CartNotifier extends ChangeNotifier {
   }
 
   /// 7. Attach verified (APPROVED) prescription to active cart
-  Future<bool> attachPrescriptionId(String prescriptionId) async {
+  Future<bool> attachPrescriptionId(String prescriptionId, {String? prescriptionName}) async {
     final cleanId = prescriptionId.trim();
     if (cleanId.isEmpty) return false;
 
     _userExplicitlyDetachedRx = false;
     _actionError = null;
+    if (prescriptionName != null && prescriptionName.trim().isNotEmpty) {
+      _attachedPrescriptionName = prescriptionName.trim();
+    }
 
     // Immediately record locally so UI updates and customer is never stuck
     _localPrescriptionIds.clear();
     _localPrescriptionIds.add(cleanId);
     if (_remoteCart != null) {
-      _remoteCart = _remoteCart!.copyWith(prescriptionId: cleanId);
+      _remoteCart = _remoteCart!.copyWith(
+        prescriptionId: cleanId,
+        prescriptionDoctorName: _attachedPrescriptionName,
+      );
     }
     _schedulePersist();
     _safeNotify();
@@ -866,8 +902,13 @@ class CartNotifier extends ChangeNotifier {
         final updatedCart = await _repository.attachPrescriptionRemote(cleanId);
         if (updatedCart != null) {
           final resolvedCart = (updatedCart.prescriptionId == null || updatedCart.prescriptionId!.isEmpty)
-              ? updatedCart.copyWith(prescriptionId: cleanId)
-              : updatedCart;
+              ? updatedCart.copyWith(
+                  prescriptionId: cleanId,
+                  prescriptionDoctorName: _attachedPrescriptionName ?? updatedCart.prescriptionDoctorName,
+                )
+              : updatedCart.copyWith(
+                  prescriptionDoctorName: _attachedPrescriptionName ?? updatedCart.prescriptionDoctorName,
+                );
           _applyRemoteCart(resolvedCart);
           return true;
         }
@@ -875,7 +916,10 @@ class CartNotifier extends ChangeNotifier {
         _actionError = e.toString();
         debugPrint('[CartNotifier] attachPrescriptionRemote error: $e');
         if (_remoteCart != null) {
-          _remoteCart = _remoteCart!.copyWith(prescriptionId: cleanId);
+          _remoteCart = _remoteCart!.copyWith(
+            prescriptionId: cleanId,
+            prescriptionDoctorName: _attachedPrescriptionName,
+          );
         }
         _safeNotify();
         return true;
@@ -888,6 +932,8 @@ class CartNotifier extends ChangeNotifier {
   /// 8. Remove attached prescription from active cart
   Future<bool> removePrescriptionId() async {
     _userExplicitlyDetachedRx = true;
+    _actionError = null;
+    _attachedPrescriptionName = null;
     _actionError = null;
 
     // Immediately clear local optimistic state

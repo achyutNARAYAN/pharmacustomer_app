@@ -20,7 +20,8 @@ import 'widgets/order_timeline_stepper.dart';
 /// - Clean Past Orders archive with 1-tap Reorder
 /// - Detailed modal sheet for deep receipt & timeline inspection
 class OrderHistory extends StatefulWidget {
-  const OrderHistory({super.key});
+  final bool isActiveTab;
+  const OrderHistory({super.key, this.isActiveTab = true});
   @override
   State<OrderHistory> createState() => _OrderHistoryState();
 }
@@ -35,16 +36,35 @@ class _OrderHistoryState extends State<OrderHistory> with WidgetsBindingObserver
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
+    if (widget.isActiveTab) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && widget.isActiveTab) {
+          context.read<OrdersProvider>().fetchOrders(silent: true);
+          _syncRealtimeTimer();
+        }
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(OrderHistory oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isActiveTab != oldWidget.isActiveTab) {
+      if (widget.isActiveTab) {
+        // User just navigated to Order History tab!
         context.read<OrdersProvider>().fetchOrders(silent: true);
         _syncRealtimeTimer();
+      } else {
+        // User switched away to another tab (Home, Search, Vault, Profile) - stop timer immediately!
+        _realtimePollTimer?.cancel();
+        _realtimePollTimer = null;
       }
-    });
+    }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!widget.isActiveTab) return;
     if (state == AppLifecycleState.resumed) {
       context.read<OrdersProvider>().fetchOrders(silent: true);
       _syncRealtimeTimer();
@@ -55,13 +75,21 @@ class _OrderHistoryState extends State<OrderHistory> with WidgetsBindingObserver
   }
 
   void _syncRealtimeTimer() {
-    if (!mounted) return;
+    if (!mounted || !widget.isActiveTab) {
+      _realtimePollTimer?.cancel();
+      _realtimePollTimer = null;
+      return;
+    }
     final provider = context.read<OrdersProvider>();
     final hasActive = provider.orders.any((o) => o.isActive);
 
     if (hasActive) {
-      _realtimePollTimer ??= Timer.periodic(const Duration(seconds: 4), (_) {
-        if (!mounted) return;
+      _realtimePollTimer ??= Timer.periodic(const Duration(seconds: 12), (_) {
+        if (!mounted || !widget.isActiveTab) {
+          _realtimePollTimer?.cancel();
+          _realtimePollTimer = null;
+          return;
+        }
         final prov = context.read<OrdersProvider>();
         if (prov.orders.any((o) => o.isActive)) {
           prov.fetchOrders(silent: true);

@@ -53,16 +53,27 @@ class Cart extends StatelessWidget {
         approvedPrescriptions.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!cart.hasPrescriptionAttached && !cart.userExplicitlyDetachedRx && context.mounted) {
-          cart.attachPrescriptionId(approvedPrescriptions.first.id);
+          final first = approvedPrescriptions.first;
+          final name = (first.doctorName != null && first.doctorName!.trim().isNotEmpty)
+              ? first.doctorName!.trim()
+              : first.fileName;
+          cart.attachPrescriptionId(first.id, prescriptionName: name);
         }
       });
     }
 
-    String? attachedRxName;
-    if (cart.prescriptionId != null && rxProvider != null) {
+    String? attachedRxName = cart.attachedPrescriptionName;
+    if (attachedRxName == null && cart.prescriptionId != null && rxProvider != null) {
+      final targetId = cart.prescriptionId!;
       for (final p in rxProvider.prescriptions) {
-        if (p.id == cart.prescriptionId) {
-          attachedRxName = p.doctorName ?? p.fileName;
+        final matchesId = p.id == targetId;
+        final matchesLocalId = p.localId != null && p.localId == targetId;
+        final matchesSubstring = (p.id.length >= 8 && targetId.contains(p.id)) ||
+            (targetId.length >= 8 && p.id.contains(targetId));
+        if (matchesId || matchesLocalId || matchesSubstring) {
+          attachedRxName = (p.doctorName != null && p.doctorName!.trim().isNotEmpty)
+              ? p.doctorName!.trim()
+              : p.fileName;
           break;
         }
       }
@@ -360,7 +371,10 @@ class Cart extends StatelessWidget {
 
     if (uploadedRx != null && context.mounted) {
       // Automatically link this verified uploaded prescription to the cart
-      await cart.attachPrescriptionId(uploadedRx.id);
+      final uploadName = (uploadedRx.doctorName != null && uploadedRx.doctorName!.trim().isNotEmpty)
+          ? uploadedRx.doctorName!.trim()
+          : uploadedRx.fileName;
+      await cart.attachPrescriptionId(uploadedRx.id, prescriptionName: uploadName);
 
       if (!context.mounted) return;
       AppToast.success(context, 'Prescription "${uploadedRx.fileName}" uploaded and attached!');
@@ -565,11 +579,17 @@ class Cart extends StatelessWidget {
                                     else if (isApproved)
                                       InkWell(
                                         onTap: () async {
-                                          final success = await cart.attachPrescriptionId(p.id);
+                                          final displayName = (p.doctorName != null && p.doctorName!.trim().isNotEmpty)
+                                              ? p.doctorName!.trim()
+                                              : p.fileName;
+                                          final success = await cart.attachPrescriptionId(
+                                            p.id,
+                                            prescriptionName: displayName,
+                                          );
                                           if (!ctx.mounted) return;
                                           Navigator.pop(ctx);
                                           if (success && context.mounted) {
-                                            AppToast.success(context, 'Prescription "${p.doctorName ?? p.fileName}" attached to cart!');
+                                            AppToast.success(context, 'Prescription "$displayName" attached to cart!');
                                           }
                                         },
                                         borderRadius: BorderRadius.circular(10),

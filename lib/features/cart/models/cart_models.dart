@@ -261,6 +261,7 @@ class CartModel {
   final int totalPayablePaise;
   final String? couponCode;
   final String? prescriptionId;
+  final String? prescriptionDoctorName;
   final DateTime? lockedAt;
   final DateTime? expiresAt;
   final DateTime? createdAt;
@@ -282,6 +283,7 @@ class CartModel {
     this.totalPayablePaise = 0,
     this.couponCode,
     this.prescriptionId,
+    this.prescriptionDoctorName,
     this.lockedAt,
     this.expiresAt,
     this.createdAt,
@@ -356,6 +358,7 @@ class CartModel {
     int? totalPayablePaise,
     String? couponCode,
     String? prescriptionId,
+    String? prescriptionDoctorName,
     DateTime? lockedAt,
     DateTime? expiresAt,
     DateTime? createdAt,
@@ -377,6 +380,7 @@ class CartModel {
       totalPayablePaise: totalPayablePaise ?? this.totalPayablePaise,
       couponCode: couponCode ?? this.couponCode,
       prescriptionId: prescriptionId ?? this.prescriptionId,
+      prescriptionDoctorName: prescriptionDoctorName ?? this.prescriptionDoctorName,
       lockedAt: lockedAt ?? this.lockedAt,
       expiresAt: expiresAt ?? this.expiresAt,
       createdAt: createdAt ?? this.createdAt,
@@ -448,6 +452,7 @@ class CartModel {
     final coupon = map['couponCode'] as String?;
 
     String? rxId;
+    String? rxDoctorName;
     final rawRx = map['prescription'] ??
         map['prescriptionId'] ??
         map['prescription_id'] ??
@@ -459,6 +464,10 @@ class CartModel {
       rxId = rawRx['prescriptionId'] as String? ??
           rawRx['_id'] as String? ??
           rawRx['id'] as String?;
+      rxDoctorName = rawRx['doctorName'] as String? ??
+          rawRx['doctor'] as String? ??
+          rawRx['fileName'] as String? ??
+          rawRx['name'] as String?;
     }
 
     DateTime? parseDate(dynamic d) {
@@ -484,6 +493,7 @@ class CartModel {
       totalPayablePaise: totalPayable,
       couponCode: coupon,
       prescriptionId: rxId,
+      prescriptionDoctorName: rxDoctorName,
       lockedAt: parseDate(map['lockedAt']),
       expiresAt: parseDate(map['expiresAt']),
       createdAt: parseDate(map['createdAt']),

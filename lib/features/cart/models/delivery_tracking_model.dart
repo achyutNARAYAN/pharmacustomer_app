@@ -19,6 +19,7 @@ class DeliveryTrackingModel {
   final double driverRating;
   final String driverVehicle;
   final String driverPhone;
+  final bool hasDriverAssigned;
   final String handoverOtp;
   final int itemCount;
   final List<String> itemNames;
@@ -40,6 +41,7 @@ class DeliveryTrackingModel {
     required this.driverRating,
     required this.driverVehicle,
     required this.driverPhone,
+    this.hasDriverAssigned = false,
     required this.handoverOtp,
     required this.itemCount,
     required this.itemNames,
@@ -62,6 +64,7 @@ class DeliveryTrackingModel {
     double? driverRating,
     String? driverVehicle,
     String? driverPhone,
+    bool? hasDriverAssigned,
     String? handoverOtp,
     int? itemCount,
     List<String>? itemNames,
@@ -83,6 +86,7 @@ class DeliveryTrackingModel {
       driverRating: driverRating ?? this.driverRating,
       driverVehicle: driverVehicle ?? this.driverVehicle,
       driverPhone: driverPhone ?? this.driverPhone,
+      hasDriverAssigned: hasDriverAssigned ?? this.hasDriverAssigned,
       handoverOtp: handoverOtp ?? this.handoverOtp,
       itemCount: itemCount ?? this.itemCount,
       itemNames: itemNames ?? this.itemNames,
@@ -118,13 +122,20 @@ class DeliveryTrackingModel {
         : '';
 
     // 2. Status resolution
-    final rawStatus = (data['status'] as String? ?? 'OUT_FOR_DELIVERY').toUpperCase();
+    final rawStatus = (data['status'] as String? ?? 'ORDER_PLACED').toUpperCase();
     final statusTitle = switch (rawStatus) {
       'DELIVERED' => 'Delivered · Order Completed',
-      'REACHED' => 'Driver has arrived at your door',
-      'DISPATCHED' => 'Dispatched from Pharmacy Hub',
-      'PREPARING' || 'CONFIRMED' => 'Preparing for dispatch',
-      _ => 'On the way · Out for delivery',
+      'REACHED' => 'Rider has arrived at your door',
+      'OUT_FOR_DELIVERY' || 'OUTFORDELIVERY' || 'DISPATCHED' => 'Out for Delivery · On the way',
+      'DRIVER_ASSIGNED' => 'Rider assigned · Heading to pharmacy',
+      'READY_FOR_PICKUP' => 'Order packed · Waiting for pickup',
+      'PACKING' || 'PROCESSING' => 'Pharmacy is packing your order',
+      'STORE_ACCEPTED' || 'CONFIRMED' || 'ACCEPTED' => 'Pharmacy accepted · Verifying items',
+      'ORDER_PLACED' => 'Order placed · Chemist verifying stock',
+      'PAYMENT_PENDING' => 'Awaiting payment confirmation',
+      'CANCELLED' => 'Order Cancelled',
+      'STORE_REJECTED' => 'Store Unavailable (Refund Initiated)',
+      _ => 'Processing order',
     };
 
     // 3. Customer Destination Coordinates & Address
@@ -241,10 +252,19 @@ class DeliveryTrackingModel {
     }
 
     // 7. Driver Info
-    final driverMap = data['driver'] is Map<String, dynamic>
-        ? data['driver'] as Map<String, dynamic>
-        : <String, dynamic>{};
-    final driverName = driverMap['name'] as String? ?? 'Ramesh Kumar';
+    final driverData = data['driver'];
+    final bool hasRealDriverMap = driverData is Map<String, dynamic> &&
+        ((driverData['name'] != null && driverData['name'].toString().trim().isNotEmpty) ||
+            (driverData['phone'] != null && driverData['phone'].toString().trim().isNotEmpty));
+    final bool isDriverAssignedStatus = rawStatus == 'DRIVER_ASSIGNED' ||
+        rawStatus == 'OUT_FOR_DELIVERY' ||
+        rawStatus == 'OUTFORDELIVERY' ||
+        rawStatus == 'DISPATCHED' ||
+        rawStatus == 'DELIVERED';
+    final bool hasDriverAssigned = hasRealDriverMap || (isDriverAssignedStatus && driverData != null);
+
+    final driverMap = driverData is Map<String, dynamic> ? driverData : <String, dynamic>{};
+    final driverName = driverMap['name'] as String? ?? (hasDriverAssigned ? 'Delivery Partner' : 'Ramesh Kumar');
     final driverRating = (driverMap['rating'] as num?)?.toDouble() ?? 4.9;
     final driverVehicle = driverMap['vehicle'] as String? ?? 'pharmaCustomer Express · Hero Electric';
     final driverPhone = driverMap['phone'] as String? ?? '+919876543210';
@@ -292,6 +312,7 @@ class DeliveryTrackingModel {
       driverRating: driverRating,
       driverVehicle: driverVehicle,
       driverPhone: driverPhone,
+      hasDriverAssigned: hasDriverAssigned,
       handoverOtp: handoverOtp,
       itemCount: itemCount,
       itemNames: itemNames,

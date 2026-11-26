@@ -50,24 +50,24 @@ class _LiveTrackingState extends State<LiveTracking> {
   }
 
   void _startOrUpdateTimers() {
-    // 1. Smart Polling
+    // 1. Live Order Status Polling while tracking screen is open
     final order = _orderModel;
     if (order != null) {
-      if (order.isPollingActive) {
-        final intervalSec = order.pollIntervalSeconds ?? 6;
+      if (order.status.isActive) {
+        final intervalSec = order.pollIntervalSeconds ?? 5;
         _pollTimer?.cancel();
         _pollTimer = Timer.periodic(Duration(seconds: intervalSec), (_) async {
           if (!mounted) return;
           await _fetchTracking(silent: true);
         });
       } else {
-        // Automatically stop polling when in terminal state (pollIntervalSeconds is null / inactive)
+        // Automatically stop polling when in terminal state (Delivered, Cancelled, Rejected, etc.)
         _pollTimer?.cancel();
         _pollTimer = null;
       }
     } else {
-      // If order not yet loaded, retry polling every 6 seconds
-      _pollTimer ??= Timer.periodic(const Duration(seconds: 6), (_) async {
+      // If order not yet loaded, retry polling every 5 seconds
+      _pollTimer ??= Timer.periodic(const Duration(seconds: 5), (_) async {
         if (!mounted) return;
         await _fetchTracking(silent: true);
       });
@@ -77,8 +77,13 @@ class _LiveTrackingState extends State<LiveTracking> {
     _countdownTimer?.cancel();
     _countdownTimer = null;
 
-    if (order?.status == OrderStatus.ORDER_PLACED && order?.storeAcceptanceDeadlineAt != null) {
-      final deadline = order!.storeAcceptanceDeadlineAt!;
+    final isAwaitingChemist = order != null &&
+        order.status == OrderStatus.ORDER_PLACED &&
+        order.storeAcceptedAt == null &&
+        order.storeAcceptanceDeadlineAt != null;
+
+    if (isAwaitingChemist) {
+      final deadline = order.storeAcceptanceDeadlineAt!;
       final now = DateTime.now();
       final diff = deadline.difference(now);
       if (diff.isNegative || diff == Duration.zero) {
@@ -256,11 +261,15 @@ class _LiveTrackingState extends State<LiveTracking> {
 
     if (!mounted) return;
 
+    if (fetchedOrder != null && ordersProvider != null) {
+      ordersProvider.addOrder(fetchedOrder);
+    }
+
     setState(() {
       _tracking = resolvedTracking;
       _orderModel = fetchedOrder ??
           (activeOrderId != null
-              ? ordersProvider?.orders.where((o) => o.orderId == activeOrderId).firstOrNull
+              ? ordersProvider?.orders.where((o) => o.orderId == activeOrderId || o.id == activeOrderId).firstOrNull
               : null);
       _isLoading = false;
     });
@@ -491,6 +500,16 @@ class _LiveTrackingState extends State<LiveTracking> {
             maxChildSize: 0.72,
             snap: true,
             builder: (context, scrollController) {
+              final isAwaitingChemist = (_orderModel?.status == OrderStatus.ORDER_PLACED) &&
+                  (_orderModel?.storeAcceptedAt == null) &&
+                  (_remainingSla > Duration.zero);
+
+              final isAcceptedOrPacking = (_orderModel?.isStoreAccepted == true ||
+                      _orderModel?.status == OrderStatus.STORE_ACCEPTED ||
+                      _orderModel?.status == OrderStatus.PACKING ||
+                      _orderModel?.status == OrderStatus.READY_FOR_PICKUP) &&
+                  _orderModel?.status.isTerminal == false;
+
               return Container(
                 decoration: const BoxDecoration(
                   color: Colors.white,
@@ -520,8 +539,8 @@ class _LiveTrackingState extends State<LiveTracking> {
                     ),
                     const SizedBox(height: 14),
 
-                    // ── 15-Minute Chemist Acceptance Countdown SLA Banner ──
-                    if (_orderModel?.status == OrderStatus.ORDER_PLACED && _remainingSla > Duration.zero) ...[
+                    // ── Chemist Acceptance & Processing Status Card ──
+                    if (isAwaitingChemist) ...[
                       Container(
                         margin: const EdgeInsets.only(bottom: 16),
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -580,6 +599,73 @@ class _LiveTrackingState extends State<LiveTracking> {
                                   fontWeight: FontWeight.bold,
                                   fontFamily: 'monospace',
                                   color: Color(0xFFB45309),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ] else if (isAcceptedOrPacking) ...[
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0FDF4),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFF16A34A), width: 1.2),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF16A34A),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.check_circle_outline, color: Colors.white, size: 20),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'ORDER ACCEPTED BY PHARMACY',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5,
+                                      color: Color(0xFF15803D),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    _orderModel?.status == OrderStatus.PACKING
+                                        ? 'Chemist is packing your medicines'
+                                        : _orderModel?.status == OrderStatus.READY_FOR_PICKUP
+                                            ? 'Medicines packed · Waiting for pickup'
+                                            : 'Prescription & inventory verified',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppTheme.text,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFDCFCE7),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Text(
+                                'VERIFIED',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF15803D),
                                 ),
                               ),
                             ),
@@ -683,102 +769,155 @@ class _LiveTrackingState extends State<LiveTracking> {
                     ],
 
                     // Driver Profile & Contact (Backend driven)
-                    Row(
-                      children: [
-                        Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            const CircleAvatar(
-                              radius: 28,
-                              backgroundColor: AppTheme.surfaceLow,
-                              child: Icon(
-                                Icons.person,
-                                color: AppTheme.primary,
-                                size: 30,
-                              ),
-                            ),
-                            Positioned(
-                              bottom: -2,
-                              right: -2,
-                              child: Container(
-                                padding: const EdgeInsets.all(3),
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFF16A34A),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.check,
-                                  color: Colors.white,
-                                  size: 10,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                    if (tracking.hasDriverAssigned) ...[
+                      Row(
+                        children: [
+                          Stack(
+                            clipBehavior: Clip.none,
                             children: [
-                              Row(
-                                children: [
-                                  Text(
-                                    tracking.driverName,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFFEF3C7),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(Icons.star_rounded, size: 14, color: Color(0xFFD97706)),
-                                        const SizedBox(width: 2),
-                                        Text(
-                                          tracking.driverRating.toStringAsFixed(1),
-                                          style: const TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            color: Color(0xFFB45309),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
+                              const CircleAvatar(
+                                radius: 28,
+                                backgroundColor: AppTheme.surfaceLow,
+                                child: Icon(
+                                  Icons.person,
+                                  color: AppTheme.primary,
+                                  size: 30,
+                                ),
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                tracking.driverVehicle,
-                                style: const TextStyle(
-                                  color: AppTheme.mutedText,
-                                  fontSize: 12,
+                              Positioned(
+                                bottom: -2,
+                                right: -2,
+                                child: Container(
+                                  padding: const EdgeInsets.all(3),
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF16A34A),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.check,
+                                    color: Colors.white,
+                                    size: 10,
+                                  ),
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                        Material(
-                          color: AppTheme.primaryContainer,
-                          shape: const CircleBorder(),
-                          child: IconButton(
-                            onPressed: () => _message(
-                              context,
-                              'Calling ${tracking.driverName} (${tracking.driverPhone})...',
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      tracking.driverName,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFEF3C7),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.star_rounded, size: 14, color: Color(0xFFD97706)),
+                                          const SizedBox(width: 2),
+                                          Text(
+                                            tracking.driverRating.toStringAsFixed(1),
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFFB45309),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  tracking.driverVehicle,
+                                  style: const TextStyle(
+                                    color: AppTheme.mutedText,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
                             ),
-                            icon: const Icon(Icons.call_rounded, color: AppTheme.primaryDark),
-                            tooltip: 'Call Driver',
                           ),
+                          Material(
+                            color: AppTheme.primaryContainer,
+                            shape: const CircleBorder(),
+                            child: IconButton(
+                              onPressed: () => _message(
+                                context,
+                                'Calling ${tracking.driverName} (${tracking.driverPhone})...',
+                              ),
+                              icon: const Icon(Icons.call_rounded, color: AppTheme.primaryDark),
+                              tooltip: 'Call Driver',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ] else ...[
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: AppTheme.surfaceLow,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppTheme.outlineBorder.withValues(alpha: 0.5)),
                         ),
-                      ],
-                    ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryContainer.withValues(alpha: 0.6),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.delivery_dining_rounded,
+                                color: AppTheme.primaryDark,
+                                size: 24,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Delivery Partner Assignment',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      color: AppTheme.text,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    isAcceptedOrPacking
+                                        ? 'Chemist is packing order. Rider will be assigned shortly.'
+                                        : 'Rider will be assigned once pharmacy accepts your order.',
+                                    style: const TextStyle(
+                                      color: AppTheme.mutedText,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
 
                     const SizedBox(height: 16),
 

@@ -12,6 +12,20 @@ import '../../core/services/api_service.dart';
 import '../category/category_detail.dart';
 import '../medicine/medicine_detail.dart';
 
+class _HealthCategoryItem {
+  final String label;
+  final String subtitle;
+  final String categoryQuery;
+  final IconData icon;
+
+  const _HealthCategoryItem({
+    required this.label,
+    required this.subtitle,
+    required this.categoryQuery,
+    required this.icon,
+  });
+}
+
 class Search extends StatefulWidget {
   final VoidCallback? onBack;
   const Search({super.key, this.onBack});
@@ -49,6 +63,12 @@ class _SearchState extends State<Search> {
     _debounceTimer = Timer(const Duration(milliseconds: 350), () {
       _fetchLiveMedicines(trimmed);
     });
+  }
+
+  void _selectTrendingQuery(String text) {
+    _searchController.text = text;
+    _onSearchChanged(text);
+    _fetchLiveMedicines(text);
   }
 
   Future<void> _fetchLiveMedicines(String query) async {
@@ -218,168 +238,62 @@ class _SearchState extends State<Search> {
       color: AppTheme.primary,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ── 1. Blinkit Trending Searches Strip ─────────────────────────────
+            _buildTrendingSearchesStrip(),
+            const SizedBox(height: 22),
+
+            // ── 2. Shop by Health Concern Header ───────────────────────────────
             Row(
               children: [
-                const Icon(Icons.shield_outlined, color: AppTheme.primary, size: 18),
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.grid_view_rounded, color: AppTheme.primary, size: 16),
+                ),
                 const SizedBox(width: 8),
-                Text('Browse by Health Concern', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontSize: 19)),
+                const Text(
+                  'Browse by Health Concern',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.text,
+                    letterSpacing: -0.2,
+                  ),
+                ),
               ],
             ),
+            const SizedBox(height: 4),
             const Padding(
-              padding: EdgeInsets.only(left: 26.0, top: 2),
+              padding: EdgeInsets.only(left: 30),
               child: Text(
-                'Find certified prescription & OTC medicines',
-                style: TextStyle(color: AppTheme.mutedText, fontSize: 13),
+                'Certified prescription & OTC medicines delivered in 10 mins',
+                style: TextStyle(color: AppTheme.mutedText, fontSize: 12),
               ),
             ),
-            const SizedBox(height: 20),
-            Material(
-              color: const Color(0xFFE7F6F4),
-              borderRadius: BorderRadius.circular(22),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(22),
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const CategoryDetail(
-                      categoryName: 'Fever & Pain',
-                    ),
-                  ),
-                ),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.teal.shade100,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.healing,
-                              color: AppTheme.primary,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Fever & Pain Relief',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 19,
-                                    color: AppTheme.text,
-                                  ),
-                                ),
-                                Text(
-                                  'Dolo, Paracetamol, Solo 650 & Analgesics',
-                                  style: TextStyle(
-                                    color: AppTheme.mutedText,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const Icon(
-                            Icons.chevron_right,
-                            size: 24,
-                            color: AppTheme.mutedText,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 18),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: Row(
-                                children: [
-                                  _chip('Dolo 650 Tablet'),
-                                  const SizedBox(width: 6),
-                                  _chip('Paracetamol 650mg'),
-                                  const SizedBox(width: 6),
-                                  _chip('Solo 650 Tablet'),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
+
+            // ── 3. Clinical 2-Column Health Category Grid ─────────────────────
             GridView.builder(
-              itemCount: 6,
+              itemCount: _healthCategories.length,
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                mainAxisExtent: 174,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                childAspectRatio: 1.45,
               ),
-              itemBuilder: (context, index) => [
-                _buildCategoryCard(
-                  'Antibiotics',
-                  'Azithral, Augmentin & more',
-                  'Active Catalogue',
-                  Icons.medication_liquid,
-                  Colors.teal,
-                ),
-                _buildCategoryCard(
-                  'Gastro & Acid Reflux',
-                  'Pan 40, Pantoprazole & antacids',
-                  'Active Catalogue',
-                  Icons.medication,
-                  Colors.cyan,
-                ),
-                _buildCategoryCard(
-                  'Fever & Pain',
-                  'Dolo, Solo, Paracetamol',
-                  'Active Catalogue',
-                  Icons.healing,
-                  Colors.red,
-                ),
-                _buildCategoryCard(
-                  'All',
-                  'View all medicines in catalogue',
-                  'Central Inventory',
-                  Icons.inventory_2_outlined,
-                  AppTheme.primary,
-                ),
-                _buildCategoryCard(
-                  'Heart & BP',
-                  'Statins, monitors & ACE',
-                  'Specialized care',
-                  Icons.favorite,
-                  Colors.purple,
-                ),
-                _buildCategoryCard(
-                  'Respiratory & Cold',
-                  'Inhalers, syrups, anti-allergy',
-                  'Respiratory Care',
-                  Icons.air,
-                  Colors.orange,
-                ),
-              ][index],
+              itemBuilder: (context, index) {
+                final item = _healthCategories[index];
+                return _buildClinicalCategoryCard(item);
+              },
             ),
           ],
         ),
@@ -387,72 +301,162 @@ class _SearchState extends State<Search> {
     );
   }
 
-  Widget _chip(String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text(
-        text,
-        style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-      ),
+  Widget _buildTrendingSearchesStrip() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Icon(Icons.local_fire_department_rounded, color: Color(0xFFEA580C), size: 16),
+            SizedBox(width: 5),
+            Text(
+              'TRENDING SEARCHES',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF9A3412),
+                letterSpacing: 0.6,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          child: Row(
+            children: _trendingSearches.map((pill) {
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: InkWell(
+                  onTap: () => _selectTrendingQuery(pill),
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.02),
+                          blurRadius: 4,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.search_rounded, size: 13, color: AppTheme.mutedText),
+                        const SizedBox(width: 5),
+                        Text(
+                          pill,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.text,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildCategoryCard(
-    String title,
-    String subtitle,
-    String count,
-    IconData icon,
-    Color color,
-  ) {
+  Widget _buildClinicalCategoryCard(_HealthCategoryItem item) {
     return Semantics(
       button: true,
-      label: '$title, $count',
+      label: '${item.label}, ${item.subtitle}',
       child: Material(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(16),
         child: InkWell(
-          borderRadius: BorderRadius.circular(22),
           onTap: () => Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => CategoryDetail(categoryName: title)),
+            MaterialPageRoute(
+              builder: (_) => CategoryDetail(categoryName: item.categoryQuery),
+            ),
           ),
+          borderRadius: BorderRadius.circular(16),
           child: Container(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: AppTheme.outlineBorder),
-              boxShadow: [BoxShadow(color: AppTheme.primary.withValues(alpha: 0.035), blurRadius: 12, offset: const Offset(0, 3))],
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.02),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Container(
-                      width: 46,
-                      height: 46,
+                      width: 36,
+                      height: 36,
                       decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(15),
+                        color: AppTheme.primary.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: AppTheme.primary.withValues(alpha: 0.15),
+                          width: 1,
+                        ),
                       ),
-                      child: Icon(icon, color: color, size: 23),
+                      child: Icon(
+                        item.icon,
+                        color: AppTheme.primaryDark,
+                        size: 20,
+                      ),
                     ),
-                    Flexible(
-                      child: Text(count, textAlign: TextAlign.end,
-                        style: const TextStyle(color: AppTheme.primary, fontWeight: FontWeight.w700, fontSize: 11)),
+                    const Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 11,
+                      color: Color(0xFF94A3B8),
                     ),
                   ],
                 ),
-                const Spacer(),
-                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppTheme.text)),
-                const SizedBox(height: 5),
-                Text(subtitle, style: const TextStyle(color: AppTheme.mutedText, fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.text,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      item.subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        color: AppTheme.mutedText,
+                        height: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -460,6 +464,94 @@ class _SearchState extends State<Search> {
       ),
     );
   }
+
+  static const List<String> _trendingSearches = [
+    'Dolo 650',
+    'Pan D',
+    'Paracetamol',
+    'Volini Spray',
+    'Band-Aid',
+    'ORS Electral',
+    'Azithral 500',
+    'Strepsils',
+    'Cetirizine',
+    'Vicks Inhaler',
+  ];
+
+  static const List<_HealthCategoryItem> _healthCategories = [
+    _HealthCategoryItem(
+      label: 'Fever & Pain Relief',
+      subtitle: 'Dolo 650, Paracetamol, Meftal',
+      categoryQuery: 'Fever & Pain',
+      icon: Icons.healing_rounded,
+    ),
+    _HealthCategoryItem(
+      label: 'Cough & Cold',
+      subtitle: 'Ascoril, Alex, Vicks Inhaler',
+      categoryQuery: 'Respiratory & Cold',
+      icon: Icons.air_rounded,
+    ),
+    _HealthCategoryItem(
+      label: 'Digestion & Acidity',
+      subtitle: 'Pan D, Digene, Gelusil',
+      categoryQuery: 'Gastro & Acid Reflux',
+      icon: Icons.medication_rounded,
+    ),
+    _HealthCategoryItem(
+      label: 'Antibiotics',
+      subtitle: 'Azithral, Augmentin, Amoxyclav',
+      categoryQuery: 'Antibiotics',
+      icon: Icons.medication_liquid_rounded,
+    ),
+    _HealthCategoryItem(
+      label: 'Cardiac & BP',
+      subtitle: 'Telma, Amlong, Atorva',
+      categoryQuery: 'Heart & BP',
+      icon: Icons.favorite_rounded,
+    ),
+    _HealthCategoryItem(
+      label: 'Diabetes Care',
+      subtitle: 'Glycomet, Januvia, Glucometers',
+      categoryQuery: 'Diabetes',
+      icon: Icons.bloodtype_rounded,
+    ),
+    _HealthCategoryItem(
+      label: 'Skin Care & Infections',
+      subtitle: 'Betnovate, Candid, Derma',
+      categoryQuery: 'Skin Care',
+      icon: Icons.spa_rounded,
+    ),
+    _HealthCategoryItem(
+      label: 'Vitamins & Immunity',
+      subtitle: 'Zincovit, Becosules, Supradyn',
+      categoryQuery: 'Vitamins & Supplements',
+      icon: Icons.wb_sunny_rounded,
+    ),
+    _HealthCategoryItem(
+      label: 'First Aid & Surgical',
+      subtitle: 'Band-Aid, Betadine, Dettol',
+      categoryQuery: 'First Aid & Surgical',
+      icon: Icons.medical_services_rounded,
+    ),
+    _HealthCategoryItem(
+      label: 'Eye & Ear Drops',
+      subtitle: 'Ciplox, Otrivin, Refresh Tears',
+      categoryQuery: 'Eye & Ear',
+      icon: Icons.visibility_rounded,
+    ),
+    _HealthCategoryItem(
+      label: 'Baby & Mother Care',
+      subtitle: 'Diapers, Gripe Water, Cerelac',
+      categoryQuery: 'Baby & Mother Care',
+      icon: Icons.child_care_rounded,
+    ),
+    _HealthCategoryItem(
+      label: 'All Medicines',
+      subtitle: 'Browse complete pharmacy catalog',
+      categoryQuery: 'All',
+      icon: Icons.grid_view_rounded,
+    ),
+  ];
 
   Widget _buildSearchResultsView(String query) {
     return RefreshIndicator(

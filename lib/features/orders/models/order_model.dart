@@ -26,20 +26,44 @@ enum OrderStatus {
         // Fallback mapping for legacy names if any
         switch (normalized) {
           case 'PLACED':
+          case 'ORDER_PLACED':
             return OrderStatus.ORDER_PLACED;
           case 'CONFIRMED':
+          case 'ACCEPTED':
+          case 'STORE_ACCEPTED':
+          case 'STOREACCEPTED':
+          case 'ACCEPTED_BY_STORE':
+          case 'STORE_CONFIRMED':
             return OrderStatus.STORE_ACCEPTED;
           case 'PROCESSING':
+          case 'PACKING':
+          case 'PACKED':
             return OrderStatus.PACKING;
+          case 'READY_FOR_PICKUP':
+          case 'READY':
+            return OrderStatus.READY_FOR_PICKUP;
+          case 'DRIVER_ASSIGNED':
+          case 'RIDER_ASSIGNED':
+          case 'ASSIGNED':
+            return OrderStatus.DRIVER_ASSIGNED;
           case 'OUT_FOR_DELIVERY':
           case 'OUTFORDELIVERY':
+          case 'DISPATCHED':
+          case 'IN_TRANSIT':
             return OrderStatus.OUT_FOR_DELIVERY;
           case 'DELIVERED':
+          case 'COMPLETED':
             return OrderStatus.DELIVERED;
           case 'CANCELLED':
+          case 'CANCELED':
             return OrderStatus.CANCELLED;
           case 'REJECTED':
+          case 'STORE_REJECTED':
+          case 'DECLINED':
             return OrderStatus.STORE_REJECTED;
+          case 'FAILED':
+          case 'DELIVERY_FAILED':
+            return OrderStatus.DELIVERY_FAILED;
           case 'REFUNDED':
             return OrderStatus.REFUNDED;
           default:
@@ -287,6 +311,9 @@ class OrderModel {
   final DateTime? deliveredAt;
   final DateTime? cancelledAt;
   final DateTime? storeAcceptanceDeadlineAt;
+  final DateTime? storeAcceptedAt;
+  final DateTime? packedAt;
+  final DateTime? dispatchedAt;
   final int? pollIntervalSeconds;
   final String? rejectionReason;
   final String? cancellationReason;
@@ -317,6 +344,9 @@ class OrderModel {
     this.deliveredAt,
     this.cancelledAt,
     this.storeAcceptanceDeadlineAt,
+    this.storeAcceptedAt,
+    this.packedAt,
+    this.dispatchedAt,
     this.pollIntervalSeconds,
     this.rejectionReason,
     this.cancellationReason,
@@ -326,7 +356,15 @@ class OrderModel {
   String get orderId => orderCode.isNotEmpty ? orderCode : id;
   bool get isActive => status.isActive;
   bool get canCancel => status.canCustomerCancel;
-  bool get isPollingActive => pollIntervalSeconds != null && pollIntervalSeconds! > 0;
+  bool get isPollingActive => status.isActive;
+  bool get isStoreAccepted =>
+      storeAcceptedAt != null ||
+      status == OrderStatus.STORE_ACCEPTED ||
+      status == OrderStatus.PACKING ||
+      status == OrderStatus.READY_FOR_PICKUP ||
+      status == OrderStatus.DRIVER_ASSIGNED ||
+      status == OrderStatus.OUT_FOR_DELIVERY ||
+      status == OrderStatus.DELIVERED;
   int get itemCount => items.fold<int>(0, (sum, i) => sum + i.quantity);
   int get totalPaise => totalPayablePaise;
   String get formattedTotal => '₹${(totalPayablePaise / 100).toStringAsFixed(2)}';
@@ -357,6 +395,9 @@ class OrderModel {
     DateTime? deliveredAt,
     DateTime? cancelledAt,
     DateTime? storeAcceptanceDeadlineAt,
+    DateTime? storeAcceptedAt,
+    DateTime? packedAt,
+    DateTime? dispatchedAt,
     int? pollIntervalSeconds,
     String? rejectionReason,
     String? cancellationReason,
@@ -387,6 +428,9 @@ class OrderModel {
       deliveredAt: deliveredAt ?? this.deliveredAt,
       cancelledAt: cancelledAt ?? this.cancelledAt,
       storeAcceptanceDeadlineAt: storeAcceptanceDeadlineAt ?? this.storeAcceptanceDeadlineAt,
+      storeAcceptedAt: storeAcceptedAt ?? this.storeAcceptedAt,
+      packedAt: packedAt ?? this.packedAt,
+      dispatchedAt: dispatchedAt ?? this.dispatchedAt,
       pollIntervalSeconds: pollIntervalSeconds ?? this.pollIntervalSeconds,
       rejectionReason: rejectionReason ?? this.rejectionReason,
       cancellationReason: cancellationReason ?? this.cancellationReason,
@@ -491,6 +535,15 @@ class OrderModel {
     final storeAcceptanceDeadlineAt = json['storeAcceptanceDeadlineAt'] != null
         ? DateTime.tryParse(json['storeAcceptanceDeadlineAt'].toString())
         : null;
+    final storeAcceptedAt = json['storeAcceptedAt'] != null
+        ? DateTime.tryParse(json['storeAcceptedAt'].toString())
+        : null;
+    final packedAt = json['packedAt'] != null
+        ? DateTime.tryParse(json['packedAt'].toString())
+        : null;
+    final dispatchedAt = json['dispatchedAt'] != null
+        ? DateTime.tryParse(json['dispatchedAt'].toString())
+        : null;
     final pollIntervalSeconds = (json['pollIntervalSeconds'] as num?)?.toInt();
     final rejectionReason = json['rejectionReason']?.toString();
     final cancellationReason = json['cancellationReason']?.toString();
@@ -521,6 +574,9 @@ class OrderModel {
       deliveredAt: deliveredAt,
       cancelledAt: cancelledAt,
       storeAcceptanceDeadlineAt: storeAcceptanceDeadlineAt,
+      storeAcceptedAt: storeAcceptedAt,
+      packedAt: packedAt,
+      dispatchedAt: dispatchedAt,
       pollIntervalSeconds: pollIntervalSeconds,
       rejectionReason: rejectionReason,
       cancellationReason: cancellationReason,
@@ -554,6 +610,12 @@ class OrderModel {
         if (cancelledAt != null) 'cancelledAt': cancelledAt!.toUtc().toIso8601String(),
         if (storeAcceptanceDeadlineAt != null)
           'storeAcceptanceDeadlineAt': storeAcceptanceDeadlineAt!.toUtc().toIso8601String(),
+        if (storeAcceptedAt != null)
+          'storeAcceptedAt': storeAcceptedAt!.toUtc().toIso8601String(),
+        if (packedAt != null)
+          'packedAt': packedAt!.toUtc().toIso8601String(),
+        if (dispatchedAt != null)
+          'dispatchedAt': dispatchedAt!.toUtc().toIso8601String(),
         if (pollIntervalSeconds != null) 'pollIntervalSeconds': pollIntervalSeconds,
         if (rejectionReason != null) 'rejectionReason': rejectionReason,
         if (cancellationReason != null) 'cancellationReason': cancellationReason,

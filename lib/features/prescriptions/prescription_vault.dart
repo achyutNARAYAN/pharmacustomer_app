@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/providers/cart_notifier.dart';
+import '../cart/cart.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/customer_support_sheet.dart';
@@ -35,6 +36,13 @@ class PrescriptionVault extends StatefulWidget {
 
 class _PrescriptionVaultState extends State<PrescriptionVault> {
   int _tab = 0;
+
+  Future<void> _onRefresh() async {
+    final rxProvider = context.read<PrescriptionProvider?>();
+    if (rxProvider != null) {
+      await rxProvider.refresh();
+    }
+  }
 
   void _handleBack() {
     if (widget.onBack != null) {
@@ -112,11 +120,15 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
             archivedCount: archivedList.length,
           ),
           Expanded(
-            child: _tab == 0
-                ? (activeList.isNotEmpty ? _activeView(activeList) : _emptyView())
-                : _tab == 1
-                ? _underReviewView(underReviewList)
-                : _archivedView(archivedList),
+            child: RefreshIndicator(
+              onRefresh: _onRefresh,
+              color: AppTheme.primary,
+              child: _tab == 0
+                  ? (activeList.isNotEmpty ? _activeView(activeList) : _emptyView())
+                  : _tab == 1
+                  ? _underReviewView(underReviewList)
+                  : _archivedView(archivedList),
+            ),
           ),
         ],
       ),
@@ -164,7 +176,7 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
   }
 
   Widget _activeView(List<Prescription> list) => ListView(
-    padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+    padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
     children: [
       ...list.map(
         (p) => Padding(
@@ -173,14 +185,12 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
             rxId: p.id,
             rxStatus: p.status,
             name: p.doctorName ?? 'Consulting Physician',
-            subtitle: 'Prescription ${p.id.length > 8 ? p.id.substring(0, 8) : p.id}',
-            date: 'Added ${_formatDate(p.createdAt)}',
+            subtitle: 'ID: #${p.id.length > 8 ? p.id.substring(0, 8) : p.id} • Valid 6 months',
+            date: _formatDate(p.createdAt),
             status: p.status.chipLabel,
           ),
         ),
       ),
-      const SizedBox(height: 12),
-      _uploadPanel(),
     ],
   );
 
@@ -299,153 +309,229 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
     }
   }
 
+  void _reorderMeds(String? rxId) {
+    if (rxId != null) {
+      final cart = context.read<CartNotifier?>();
+      cart?.attachPrescriptionId(rxId);
+      AppToast.success(context, 'Prescription linked! Pharmacist will verify refills.');
+      Navigator.push(
+        context,
+        MaterialPageRoute<void>(builder: (_) => const Cart()),
+      );
+    } else {
+      AppToast.info(context, 'Opening medicines catalog...');
+      Navigator.push(
+        context,
+        MaterialPageRoute<void>(builder: (_) => const Search()),
+      );
+    }
+  }
+
   Widget _prescriptionCard({
     required String name,
     required String subtitle,
     required String date,
     required String status,
-    List<(String, String)> medicines = const [],
     String? rxId,
     PrescriptionStatus rxStatus = PrescriptionStatus.approved,
-  }) => Container(
-    padding: const EdgeInsets.all(16),
-    decoration: _cardDecoration(),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _iconTile(Icons.medical_services_outlined),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.text,
+  }) {
+    final isVerified = rxStatus == PrescriptionStatus.approved || rxStatus == PrescriptionStatus.uploaded;
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Top row: Rx mini ticket badge + Doctor Name + Verified Pill
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 44,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppTheme.primary.withValues(alpha: 0.2),
                     ),
                   ),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.textSecondary,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        'Rx',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          color: AppTheme.primaryDark,
+                          height: 1.1,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        date.split(' ').take(2).join(' ').toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 8,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              name,
+                              style: const TextStyle(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.text,
+                                letterSpacing: -0.2,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.verified_rounded, size: 14, color: Color(0xFF0D9488)),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'For ${widget.patientName} • MD Physician',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.mutedText,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          fontSize: 10.5,
+                          color: Color(0xFF94A3B8),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isVerified ? const Color(0xFFE6F4EA) : const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isVerified ? const Color(0xFFA7F3D0) : const Color(0xFFFDE68A),
                     ),
                   ),
-                ],
-              ),
-            ),
-            _pill(status, const Color(0xFFE5F5EE), const Color(0xFF168457)),
-          ],
-        ),
-        const Divider(height: 14),
-        const SizedBox(height: 4),
-        const Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Linked Prescribed Medications',
-              style: TextStyle(
-                fontSize: 11,
-                color: AppTheme.textSecondary,
-              ),
-            ),
-            Text(
-              'Dosage Refills Available',
-              style: TextStyle(
-                fontSize: 11,
-                color: AppTheme.primary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-        if (medicines.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          ...medicines.map(
-            (item) => Container(
-              margin: const EdgeInsets.only(top: 6),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 10,
-              ),
-              decoration: BoxDecoration(
-                color: AppTheme.surfaceLow,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.medication_outlined,
-                    size: 15,
-                    color: AppTheme.primary,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 5,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: isVerified ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        status.toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          color: isVerified ? const Color(0xFF065F46) : const Color(0xFF92400E),
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      item.$1,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
+                ),
+              ],
+            ),
+          ),
+
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+
+          // Action row: 2 smart compact buttons
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _reorderMeds(rxId),
+                    icon: const Icon(Icons.shopping_cart_checkout_rounded, size: 15),
+                    label: const Text('Reorder All Meds'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      textStyle: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
                       ),
                     ),
                   ),
-                  _pill(
-                    item.$2,
-                    const Color(0xFFD9F5FA),
-                    AppTheme.textSecondary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 2,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showDocument(rxId, rxStatus),
+                    icon: const Icon(Icons.visibility_outlined, size: 14),
+                    label: const Text('View Slip'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.text,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      side: const BorderSide(color: Color(0xFFCBD5E1)),
+                      textStyle: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ],
-        const SizedBox(height: 16),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: () => _showDocument(rxId, rxStatus),
-            icon: const Icon(Icons.visibility_outlined, size: 17),
-            label: const Text('View'),
-          ),
-        ),
-      ],
-    ),
-  );
-
-  Widget _uploadPanel() => Container(
-    padding: const EdgeInsets.fromLTRB(16, 20, 16, 18),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: const Color(0xFFA8D7E0), width: 1.5),
-    ),
-    child: Column(
-      children: [
-        _iconTile(Icons.cloud_upload_outlined, size: 48),
-        const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: _uploadPrescription,
-            icon: const Icon(Icons.add_circle_outline),
-            label: const Text('Upload New Prescription'),
-          ),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'Gallery images or PDF',
-          style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-        ),
-      ],
-    ),
-  );
+      ),
+    );
+  }
 
   Widget _archivedView(List<Prescription> list) {
     if (list.isEmpty) {
@@ -891,8 +977,6 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
             ),
           ),
         ),
-        const SizedBox(height: 16),
-        _uploadPanel(),
       ],
     );
   }
