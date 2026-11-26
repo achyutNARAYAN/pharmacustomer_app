@@ -5,6 +5,7 @@ import '../../core/providers/cart_notifier.dart';
 import '../../core/providers/load_status.dart';
 import '../../core/models/cart_item.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/app_toast.dart';
 import 'models/cart_models.dart';
 import '../prescriptions/providers/prescription_provider.dart';
 import '../prescriptions/repositories/prescription_repository.dart';
@@ -169,12 +170,7 @@ class Cart extends StatelessWidget {
                         onRemovePressed: () async {
                           await cart.removePrescriptionId();
                           if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Prescription detached from order'),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
+                            AppToast.info(context, 'Prescription detached from order');
                           }
                         },
                       ),
@@ -273,19 +269,11 @@ class Cart extends StatelessWidget {
               child: ElevatedButton(
                 onPressed: () {
                   if (requiresRx && !hasRxAttached) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: const Text(
-                          'Schedule H medicine requires an approved doctor\'s prescription. Please attach one to proceed.',
-                        ),
-                        backgroundColor: Colors.amber.shade900,
-                        behavior: SnackBarBehavior.floating,
-                        action: SnackBarAction(
-                          label: 'Attach',
-                          textColor: Colors.white,
-                          onPressed: () => _openPrescriptionPicker(context, cart),
-                        ),
-                      ),
+                    AppToast.info(
+                      context,
+                      'Schedule H medicine requires an approved doctor\'s prescription. Please attach one to proceed.',
+                      actionLabel: 'Attach',
+                      onAction: () => _openPrescriptionPicker(context, cart),
                     );
                     return;
                   }
@@ -375,19 +363,7 @@ class Cart extends StatelessWidget {
       await cart.attachPrescriptionId(uploadedRx.id);
 
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle, color: Colors.white, size: 20),
-              const SizedBox(width: 8),
-              Expanded(child: Text('Prescription "${uploadedRx.fileName}" uploaded and attached!')),
-            ],
-          ),
-          backgroundColor: AppTheme.primaryDark,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      AppToast.success(context, 'Prescription "${uploadedRx.fileName}" uploaded and attached!');
     }
   }
 
@@ -593,21 +569,7 @@ class Cart extends StatelessWidget {
                                           if (!ctx.mounted) return;
                                           Navigator.pop(ctx);
                                           if (success && context.mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              SnackBar(
-                                                content: Row(
-                                                  children: [
-                                                    const Icon(Icons.check_circle, color: Colors.white, size: 20),
-                                                    const SizedBox(width: 8),
-                                                    Expanded(
-                                                      child: Text('Prescription "${p.doctorName ?? p.fileName}" attached to cart!'),
-                                                    ),
-                                                  ],
-                                                ),
-                                                backgroundColor: AppTheme.primaryDark,
-                                                behavior: SnackBarBehavior.floating,
-                                              ),
-                                            );
+                                            AppToast.success(context, 'Prescription "${p.doctorName ?? p.fileName}" attached to cart!');
                                           }
                                         },
                                         borderRadius: BorderRadius.circular(10),

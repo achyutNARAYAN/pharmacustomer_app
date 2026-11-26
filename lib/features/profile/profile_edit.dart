@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'customer_address_screen.dart';
 
 import '../../core/theme.dart';
+import '../../core/widgets/app_toast.dart';
 
 class ProfileDetails {
   const ProfileDetails({
@@ -65,9 +66,7 @@ class _ProfileEditState extends State<ProfileEdit> {
 
   void _save() {
     if (_name.text.trim().isEmpty || _phone.text.trim().isEmpty || _address.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Name, phone, and address are required.')),
-      );
+      AppToast.error(context, 'Name, phone, and address are required.');
       return;
     }
     Navigator.pop(context, ProfileDetails(

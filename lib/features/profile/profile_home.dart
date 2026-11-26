@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/customer_support_sheet.dart';
 import '../auth/login.dart';
 import '../auth/providers/auth_provider.dart';
@@ -257,9 +258,7 @@ class ProfileHome extends StatelessWidget {
       await context.read<AuthProvider>().logout();
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not log out. Please try again.')),
-        );
+        AppToast.error(context, 'Could not log out. Please try again.');
       }
       return;
     }

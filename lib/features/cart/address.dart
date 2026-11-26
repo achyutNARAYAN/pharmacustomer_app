@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/services/api_service.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../core/providers/cart_notifier.dart';
 import '../../core/providers/profile_notifier.dart';
 import '../../core/utils/pincode_validator.dart';
@@ -157,12 +158,8 @@ class _AddressState extends State<Address> {
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(e.toString().replaceAll('ValidationFailure: ', '').replaceAll('NetworkFailure: ', '')),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+          final err = e.toString().replaceAll('ValidationFailure: ', '').replaceAll('NetworkFailure: ', '');
+          AppToast.error(context, err);
         }
       }
     } else {
@@ -187,22 +184,12 @@ class _AddressState extends State<Address> {
             isDefault: result.isDefault,
           );
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Address updated successfully.'),
-                behavior: SnackBarBehavior.floating,
-                duration: Duration(seconds: 2),
-              ),
-            );
+            AppToast.success(context, 'Address updated successfully.');
           }
         } catch (e) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(e.toString().replaceAll('ValidationFailure: ', '').replaceAll('NetworkFailure: ', '')),
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
+            final err = e.toString().replaceAll('ValidationFailure: ', '').replaceAll('NetworkFailure: ', '');
+            AppToast.error(context, err);
           }
         }
       }
@@ -320,12 +307,9 @@ class _AddressState extends State<Address> {
                       if (_addresses.isNotEmpty && _selected < _addresses.length) {
                         final sel = _addresses[_selected];
                         if (sel.pincode.isNotEmpty && !PincodeValidator.isServiceable(sel.pincode)) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('PIN code ${sel.pincode} is not serviceable for delivery. Please select or add a serviceable address.'),
-                              backgroundColor: Colors.red.shade800,
-                              behavior: SnackBarBehavior.floating,
-                            ),
+                          AppToast.error(
+                            context,
+                            'PIN code ${sel.pincode} is not serviceable for delivery. Please select or add a serviceable address.',
                           );
                           return;
                         }
@@ -375,13 +359,7 @@ class _AddressState extends State<Address> {
                           setState(() => _allocating = false);
 
                           if (!ok && cart.actionError != null) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(cart.actionError!),
-                                backgroundColor: Colors.red.shade800,
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
+                            AppToast.error(context, cart.actionError!);
                             return;
                           }
                         }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/app_toast.dart';
 import 'models/customer_address.dart';
 import 'providers/customer_address_provider.dart';
 import 'repositories/address_repository.dart';
@@ -79,13 +80,7 @@ class _AddressManagementViewState extends State<_AddressManagementView> {
       final saved = await provider.addAddress(newAddress);
       if (!mounted) return;
       if (saved != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${saved.typeKey} address added successfully!'),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: AppTheme.primary,
-          ),
-        );
+        AppToast.success(context, '${saved.typeKey} address added successfully!');
       }
     }
   }
@@ -103,12 +98,7 @@ class _AddressManagementViewState extends State<_AddressManagementView> {
       final success = await provider.updateAddress(updated);
       if (!mounted) return;
       if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${updated.typeKey} address updated successfully!'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        AppToast.success(context, '${updated.typeKey} address updated successfully!');
       }
     }
   }
@@ -140,12 +130,7 @@ class _AddressManagementViewState extends State<_AddressManagementView> {
       final provider = context.read<CustomerAddressProvider>();
       await provider.deleteAddress(address.id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${address.typeKey} address removed.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      AppToast.info(context, '${address.typeKey} address removed.');
     }
   }
 

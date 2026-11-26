@@ -3,6 +3,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import '../../../core/theme.dart';
 import '../../../core/utils/pincode_validator.dart';
+import '../../../core/widgets/app_toast.dart';
 import '../models/customer_address.dart';
 
 /// Modal sheet or dialog for adding or editing a customer delivery address.
@@ -126,9 +127,7 @@ class _AddEditAddressSheetState extends State<AddEditAddressSheet> {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Please enable GPS / location service.')),
-          );
+          AppToast.info(context, 'Please enable GPS / location service.');
         }
         return;
       }
@@ -138,9 +137,7 @@ class _AddEditAddressSheetState extends State<AddEditAddressSheet> {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Location permission denied.')),
-            );
+            AppToast.error(context, 'Location permission denied.');
           }
           return;
         }
@@ -148,9 +145,7 @@ class _AddEditAddressSheetState extends State<AddEditAddressSheet> {
 
       if (permission == LocationPermission.deniedForever) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Location permission is permanently denied. Please allow in app settings.')),
-          );
+          AppToast.error(context, 'Location permission is permanently denied. Please allow in app settings.');
         }
         return;
       }
@@ -198,9 +193,7 @@ class _AddEditAddressSheetState extends State<AddEditAddressSheet> {
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not fetch GPS location. Please enter manually.')),
-        );
+        AppToast.error(context, 'Could not fetch GPS location. Please enter manually.');
       }
     } finally {
       if (mounted) {
@@ -215,9 +208,7 @@ class _AddEditAddressSheetState extends State<AddEditAddressSheet> {
     final pinVal = _pinCode.text.trim();
     final result = PincodeValidator.validate(pinVal);
     if (!result.isValidFormat) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid 6-digit PIN code.')),
-      );
+      AppToast.error(context, 'Please enter a valid 6-digit PIN code.');
       return;
     }
 

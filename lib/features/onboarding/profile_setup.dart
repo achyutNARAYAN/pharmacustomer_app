@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../core/services/api_service.dart';
 import '../../core/providers/profile_notifier.dart';
+import '../../core/widgets/app_toast.dart';
 import '../auth/models/auth_session.dart';
 import '../auth/providers/auth_provider.dart';
 import '../home/main_nav_wrapper.dart';
@@ -69,14 +70,7 @@ class _ProfileSetupState extends State<ProfileSetup> {
   Future<void> _completeProfile() async {
     final name = _nameController.text.trim();
     if (name.isEmpty || _dobController.text.isEmpty || _selectedGender == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please enter your name, date of birth, and gender'),
-          backgroundColor: AppTheme.error,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
+      AppToast.error(context, 'Please enter your name, date of birth, and gender');
       return;
     }
     final dobIso = _selectedDobDate != null
@@ -142,14 +136,7 @@ class _ProfileSetupState extends State<ProfileSetup> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString().replaceAll('ValidationFailure: ', '').replaceAll('NetworkFailure: ', '')),
-          backgroundColor: AppTheme.error,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
+      AppToast.error(context, e.toString().replaceAll('ValidationFailure: ', '').replaceAll('NetworkFailure: ', ''));
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }

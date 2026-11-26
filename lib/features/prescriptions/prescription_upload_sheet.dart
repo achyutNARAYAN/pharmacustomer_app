@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/theme.dart';
+import '../../core/widgets/app_toast.dart';
 
 Future<PlatformFile?> showPrescriptionUploadSheet(BuildContext context) =>
     showModalBottomSheet<PlatformFile?>(
@@ -35,9 +36,7 @@ class _PrescriptionUploadSheetState extends State<_PrescriptionUploadSheet> {
           if (!mounted) return;
           final file = PlatformFile(name: image.name, path: image.path, size: size);
           if (file.size > 15 * 1024 * 1024) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Choose a file smaller than 15 MB.')),
-            );
+            AppToast.error(context, 'Choose a file smaller than 15 MB.');
           } else {
             Navigator.pop(context, file);
           }
@@ -54,18 +53,14 @@ class _PrescriptionUploadSheetState extends State<_PrescriptionUploadSheet> {
       final file = result?.files.firstOrNull;
       if (file != null) {
         if (file.size > 15 * 1024 * 1024) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Choose a file smaller than 15 MB.')),
-          );
+          AppToast.error(context, 'Choose a file smaller than 15 MB.');
         } else {
           Navigator.pop(context, file);
         }
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open the selected file.')),
-        );
+        AppToast.error(context, 'Could not open the selected file.');
       }
     } finally {
       if (mounted) setState(() => _picking = false);

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/providers/cart_notifier.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/app_toast.dart';
 
 class CouponOffers extends StatefulWidget {
   const CouponOffers({super.key, required this.onApply, required this.applied});
@@ -44,13 +45,7 @@ class _CouponOffersState extends State<CouponOffers> {
     if (success) {
       widget.onApply(trimmed);
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Coupon \'$trimmed\' applied successfully!'),
-          backgroundColor: AppTheme.primary,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      AppToast.success(context, 'Coupon \'$trimmed\' applied successfully!');
     } else {
       setState(() {
         final rawErr = cart.actionError ?? 'Unable to apply coupon. Please check minimum order value.';

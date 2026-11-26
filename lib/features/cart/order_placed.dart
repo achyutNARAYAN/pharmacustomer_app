@@ -1,17 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/models/cart_item.dart';
 import '../../core/providers/cart_notifier.dart';
 import '../../core/providers/profile_notifier.dart';
 import '../../core/theme.dart';
-import '../orders/models/order_model.dart';
-import '../orders/widgets/order_timeline_stepper.dart';
+import '../../core/widgets/app_toast.dart';
 import '../profile/providers/customer_address_provider.dart';
-import 'tax_invoice.dart';
 import 'live_tracking.dart';
+import 'tax_invoice.dart';
 
-class OrderPlaced extends StatelessWidget {
+/// Senior Quick-Commerce Order Placed Confirmation Screen
+/// Designed to Blinkit & Zomato celebration standards:
+/// - Hero Celebration with live ETA (10-15 mins)
+/// - Tap-to-copy Order ID
+/// - Route & Pharmacy verification snapshot
+/// - Collapsible itemized bill & payment proof
+/// - Dual actions: [ Track Live Delivery ] and [ Back to Home ]
+class OrderPlaced extends StatefulWidget {
   final String? orderId;
   final List<CartItem>? orderedItems;
   final double? totalPaid;
@@ -37,11 +44,29 @@ class OrderPlaced extends StatelessWidget {
     this.paymentMethod,
   });
 
+  @override
+  State<OrderPlaced> createState() => _OrderPlacedState();
+}
+
+class _OrderPlacedState extends State<OrderPlaced> {
+  bool _isItemsExpanded = false;
+
   String _formatPharmacyName(String? raw) {
-    if (raw == null || raw.trim().isEmpty) return '';
+    if (raw == null || raw.trim().isEmpty) return 'pharmaCustomer Express Pharmacy';
     final words = raw.trim().split(RegExp(r'\s+'));
-    if (words.length <= 2) return words.join(' ');
-    return '${words[0]} ${words[1]}';
+    if (words.length <= 3) return words.join(' ');
+    return '${words[0]} ${words[1]} ${words[2]}';
+  }
+
+  void _copyOrderId(BuildContext context, String id) {
+    Clipboard.setData(ClipboardData(text: id));
+    AppToast.show(
+      context,
+      'Order ID #$id copied to clipboard',
+      icon: Icons.copy_rounded,
+      iconColor: const Color(0xFF6EE7B7),
+      duration: const Duration(seconds: 2),
+    );
   }
 
   @override
@@ -61,41 +86,53 @@ class OrderPlaced extends StatelessWidget {
             ? profile.address
             : 'Primary Delivery Location');
 
-    final items = orderedItems ?? cart.items;
-    final count = totalCount ??
-        (orderedItems != null
-            ? orderedItems!.fold<int>(0, (sum, i) => sum + i.quantity)
+    final items = widget.orderedItems ?? cart.items;
+    final count = widget.totalCount ??
+        (widget.orderedItems != null
+            ? widget.orderedItems!.fold<int>(0, (sum, i) => sum + i.quantity)
             : cart.totalCount);
-    final paid = totalPaid ?? cart.totalPrice;
+    final paid = widget.totalPaid ?? cart.totalPrice;
 
-    final effectiveItemsTotal = itemsTotal ??
+    final effectiveItemsTotal = widget.itemsTotal ??
         (cart.itemsTotalPaise > 0
             ? (cart.itemsTotalPaise / 100.0)
             : items.fold<double>(0.0, (sum, i) => sum + i.total));
-    final effectiveDiscount = discount ?? (cart.discountPaise / 100.0);
-    final effectiveDeliveryFee = deliveryFee ??
-        (cart.deliveryFeePaise > 0 ? (cart.deliveryFeePaise / 100.0) : 40.0);
-    final effectiveCoupon = couponCode ?? cart.couponCode;
-    final effectiveStore = allocatedStore ?? cart.allocatedStore;
-    final effectiveMethod = paymentMethod ?? 'UPI';
+    final effectiveDiscount = widget.discount ?? (cart.discountPaise / 100.0);
+    final effectiveDeliveryFee = widget.deliveryFee ??
+        (cart.deliveryFeePaise > 0 ? (cart.deliveryFeePaise / 100.0) : 0.0);
+    final effectiveCoupon = widget.couponCode ?? cart.couponCode;
+    final effectiveStore = widget.allocatedStore ?? cart.allocatedStore;
+    final effectiveMethod = widget.paymentMethod ?? 'UPI';
 
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: const Color(0xFFF8FAFC), // Modern off-white background
       appBar: AppBar(
+        elevation: 0,
+        backgroundColor: Colors.white,
+        centerTitle: false,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back, color: AppTheme.text),
           onPressed: () => Navigator.popUntil(context, (route) => route.isFirst),
         ),
         title: const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'ORDER CONFIRMED',
-              style: TextStyle(fontSize: 10, color: AppTheme.mutedText, letterSpacing: .5),
+              'ORDER CONFIRMATION',
+              style: TextStyle(
+                fontSize: 10,
+                color: AppTheme.mutedText,
+                letterSpacing: 0.6,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             Text(
-              'Processing Order',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+              'Order Placed',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.text,
+              ),
             ),
           ],
         ),
@@ -105,7 +142,7 @@ class OrderPlaced extends StatelessWidget {
               context,
               MaterialPageRoute<void>(
                 builder: (_) => TaxInvoice(
-                  orderId: orderId,
+                  orderId: widget.orderId,
                   items: items,
                   totalPaid: paid,
                   orderDate: DateTime.now(),
@@ -117,295 +154,469 @@ class OrderPlaced extends StatelessWidget {
                 ),
               ),
             ),
-            icon: const Icon(Icons.receipt_long_outlined),
+            icon: const Icon(Icons.receipt_long_outlined, color: AppTheme.primary),
             tooltip: 'View Invoice',
           ),
+          const SizedBox(width: 6),
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
         children: [
-          // ── Card 1: Order Status Confirmation ─────────────────────────────
-          _card(
-            Column(
+          // ── 1. Hero Celebration Card (Blinkit Style) ───────────────────────
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.primary.withValues(alpha: 0.05),
+                  blurRadius: 18,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
               children: [
-                const CircleAvatar(
-                  radius: 28,
-                  backgroundColor: AppTheme.surfaceLow,
-                  child: Icon(
-                    Icons.check_circle,
-                    size: 36,
-                    color: AppTheme.primaryDark,
+                // Celebration Animated Checkmark Ring
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDCFCE7),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFF86EFAC), width: 2),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.check_circle_rounded,
+                      size: 46,
+                      color: Color(0xFF16A34A),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
+
+                // Exciting Headline
                 const Text(
-                  'Payment Confirmed Order placed successfully!',
+                  'Order Confirmed!',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: -0.3,
+                    color: AppTheme.text,
+                  ),
                 ),
-                if (orderId != null) ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surfaceLow,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      'Order ID: #$orderId',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.primaryDark,
+                const SizedBox(height: 6),
+
+                // Express Delivery ETA Badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE0F2F1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.moped_rounded, size: 16, color: AppTheme.primaryDark),
+                      SizedBox(width: 6),
+                      Text(
+                        'Express Delivery in 10–15 mins',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.primaryDark,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Order Code Chip with Tap-to-Copy
+                if (widget.orderId != null) ...[
+                  const SizedBox(height: 14),
+                  InkWell(
+                    onTap: () => _copyOrderId(context, widget.orderId!),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Order #${widget.orderId}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          const Icon(Icons.copy_rounded, size: 14, color: AppTheme.mutedText),
+                        ],
                       ),
                     ),
                   ),
                 ],
-                const SizedBox(height: 14),
-                const OrderTimelineStepper(
-                  status: OrderStatus.ORDER_PLACED,
-                  isCompact: true,
-                ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
-          // ── Card 2: Express Delivery Slot & Pharmacy (Matches Order Review) ──
-          _card(
-            Row(
+          // ── 2. Route & Pharmacy Verification Card ─────────────────────────
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _iconBox(Icons.local_shipping_outlined),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Wrap(
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        spacing: 8,
-                        runSpacing: 4,
+                // Top Verification Row
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDCFCE7),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text(
-                            'Express Delivery Slot',
-                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE8F5E9),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Text(
-                              'Confirmed',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF2E7D32),
-                              ),
+                          Icon(Icons.verified_rounded, size: 13, color: Color(0xFF16A34A)),
+                          SizedBox(width: 4),
+                          Text(
+                            'Verified Partner Chemist',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF16A34A),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 3),
-                      Text(
-                        deliveryAddress,
-                        style: const TextStyle(color: AppTheme.mutedText, height: 1.35),
+                    ),
+                    const Spacer(),
+                    const Text(
+                      'Slot: Now',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.primaryDark,
                       ),
-                      if (effectiveStore != null && effectiveStore.isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Row(
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // Pharmacy Row
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surfaceLow,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.storefront_rounded, size: 18, color: AppTheme.primary),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Fulfilling Pharmacy',
+                            style: TextStyle(fontSize: 11, color: AppTheme.mutedText),
+                          ),
+                          const SizedBox(height: 1),
+                          Text(
+                            _formatPharmacyName(effectiveStore),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.text,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                // Dashed Route Connector
+                Padding(
+                  padding: const EdgeInsets.only(left: 15, top: 4, bottom: 4),
+                  child: Container(
+                    height: 18,
+                    width: 2,
+                    color: const Color(0xFFCBD5E1),
+                  ),
+                ),
+
+                // Destination Address Row
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.location_on_rounded, size: 18, color: Color(0xFFD97706)),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Delivering To',
+                            style: TextStyle(fontSize: 11, color: AppTheme.mutedText),
+                          ),
+                          const SizedBox(height: 1),
+                          Text(
+                            deliveryAddress,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.text,
+                              height: 1.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // ── 3. Medicines & Collapsible Bill Breakdown (Blinkit Style) ───────
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Summary Header with Expand Toggle
+                InkWell(
+                  onTap: () => setState(() => _isItemsExpanded = !_isItemsExpanded),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(7),
+                        decoration: BoxDecoration(
+                          color: AppTheme.surfaceLow,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.receipt_outlined, size: 18, color: AppTheme.primary),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(Icons.storefront_outlined, size: 15, color: AppTheme.primary),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                'Pharmacy: ${_formatPharmacyName(effectiveStore)}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: AppTheme.primaryDark,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
+                            Text(
+                              'Order Summary ($count medicines)',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.text),
+                            ),
+                            Text(
+                              'Paid ₹${paid.toStringAsFixed(0)} via $effectiveMethod',
+                              style: const TextStyle(fontSize: 12, color: AppTheme.mutedText),
                             ),
                           ],
                         ),
-                      ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDCFCE7),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text(
+                          'PAID',
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF16A34A)),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Icon(
+                        _isItemsExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                        color: AppTheme.textSecondary,
+                      ),
                     ],
                   ),
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
 
-          // ── Card 3: Medicines & Complete FinTech Bill Breakdown ─────────────
-          _card(
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Medicines $count items',
-                  style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
-                ),
-                const Divider(height: 26),
-                ...items.map(
-                  (item) => Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _iconBox(Icons.medication_outlined, small: true),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item.name,
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '${item.pack} · ${item.quantity} unit',
-                                style: const TextStyle(color: AppTheme.mutedText),
-                              ),
-                            ],
+                // Expandable Items List
+                if (_isItemsExpanded) ...[
+                  const Divider(height: 24, color: Color(0xFFE2E8F0)),
+                  ...items.map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(5),
+                            decoration: BoxDecoration(
+                              color: AppTheme.surfaceLow,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Icon(Icons.medication_outlined, size: 14, color: AppTheme.primary),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '₹${item.total.toStringAsFixed(0)}',
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                      ],
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.name,
+                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                ),
+                                Text(
+                                  '${item.pack} • Qty: ${item.quantity}',
+                                  style: const TextStyle(color: AppTheme.mutedText, fontSize: 11),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Text(
+                            '₹${item.total.toStringAsFixed(0)}',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                const Divider(),
-                _row('Items total', '₹${effectiveItemsTotal.toStringAsFixed(0)}'),
-                if (effectiveDiscount > 0) ...[
-                  _row(
-                    effectiveCoupon != null && effectiveCoupon.isNotEmpty
-                        ? 'Coupon discount ($effectiveCoupon)'
-                        : 'Prescription subsidy & discount',
-                    '−₹${effectiveDiscount.toStringAsFixed(0)}',
-                    green: true,
+                  const Divider(height: 20, color: Color(0xFFE2E8F0)),
+                  _billRow('Items total', '₹${effectiveItemsTotal.toStringAsFixed(0)}'),
+                  if (effectiveDiscount > 0)
+                    _billRow(
+                      effectiveCoupon != null && effectiveCoupon.isNotEmpty
+                          ? 'Coupon discount ($effectiveCoupon)'
+                          : 'Prescription subsidy & discount',
+                      '−₹${effectiveDiscount.toStringAsFixed(0)}',
+                      isGreen: true,
+                    ),
+                  _billRow(
+                    'Express delivery',
+                    effectiveDeliveryFee == 0 ? 'FREE' : '₹${effectiveDeliveryFee.toStringAsFixed(0)}',
+                    isGreen: effectiveDeliveryFee == 0,
                   ),
+                  _billRow('Handling & packaging', 'FREE', isGreen: true),
+                  _billRow('Taxes (GST included)', 'Included'),
                 ],
-                _row(
-                  'Express delivery',
-                  effectiveDeliveryFee == 0
-                      ? 'FREE'
-                      : '₹${effectiveDeliveryFee.toStringAsFixed(0)}',
-                  green: effectiveDeliveryFee == 0,
-                ),
-                _row('Handling & packaging', 'FREE', green: true),
-                _row('Taxes (GST included)', 'Included'),
-                const Divider(height: 24),
-                _row(
-                  'Total paid',
-                  '₹${paid.toStringAsFixed(0)}',
-                  bold: true,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // ── Card 4: Payment Method (Matches Order Review) ───────────────────
-          _card(
-            Row(
-              children: [
-                _iconBox(Icons.account_balance_wallet_outlined),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Payment method',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        'Paid via $effectiveMethod · Completed',
-                        style: const TextStyle(color: AppTheme.mutedText),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8F5E9),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Text(
-                    'PAID',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF2E7D32),
-                    ),
-                  ),
-                ),
               ],
             ),
           ),
         ],
       ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
-          child: ElevatedButton.icon(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute<void>(
-                builder: (_) => const LiveTracking(),
-              ),
+
+      // ── Dual Bottom Actions (Track vs Home) ───────────────────────────────
+      bottomNavigationBar: Container(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 18),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black12,
+              blurRadius: 10,
+              offset: Offset(0, -3),
             ),
-            icon: const Icon(Icons.local_shipping_outlined),
-            label: const Text('Track Live Delivery'),
+          ],
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Primary Action: Live Tracking
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute<void>(
+                        builder: (_) => LiveTracking(orderId: widget.orderId),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.moped_rounded, size: 20),
+                  label: const Text(
+                    'Track Live Delivery',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              // Secondary Action: Back to Home
+              SizedBox(
+                width: double.infinity,
+                child: TextButton.icon(
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppTheme.textSecondary,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                  onPressed: () => Navigator.popUntil(context, (route) => route.isFirst),
+                  icon: const Icon(Icons.home_outlined, size: 18),
+                  label: const Text(
+                    'Back to Home',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
-}
 
-Widget _card(Widget child) => Material(
-  color: Colors.white,
-  shape: RoundedRectangleBorder(
-    borderRadius: BorderRadius.circular(24),
-    side: const BorderSide(color: AppTheme.outlineBorder),
-  ),
-  clipBehavior: Clip.antiAlias,
-  child: Padding(padding: const EdgeInsets.all(20), child: child),
-);
-
-Widget _iconBox(IconData icon, {bool small = false}) => Container(
-  width: small ? 38 : 48,
-  height: small ? 38 : 48,
-  decoration: BoxDecoration(color: AppTheme.surfaceLow, borderRadius: BorderRadius.circular(14)),
-  child: Icon(icon, color: AppTheme.primary, size: small ? 21 : 25),
-);
-
-Widget _row(String label, String value, {bool bold = false, bool green = false}) => Padding(
-  padding: const EdgeInsets.symmetric(vertical: 6),
-  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    Expanded(child: Text(label, style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.normal, height: 1.3))),
-    const SizedBox(width: 12),
-    Text(
-      value,
-      style: TextStyle(
-        fontWeight: FontWeight.bold,
-        color: green ? AppTheme.successText : (bold ? AppTheme.primaryDark : AppTheme.text),
+  static Widget _billRow(String label, String value, {bool isGreen = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: isGreen ? const Color(0xFF16A34A) : AppTheme.text,
+            ),
+          ),
+        ],
       ),
-    ),
-  ]),
-);
+    );
+  }
+}

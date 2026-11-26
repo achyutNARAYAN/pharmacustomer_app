@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../core/services/api_service.dart';
 import '../../core/providers/profile_notifier.dart';
+import '../../core/widgets/app_toast.dart';
 import 'models/auth_session.dart';
 import 'providers/auth_provider.dart';
 import '../home/main_nav_wrapper.dart';
@@ -55,14 +56,10 @@ class _OtpState extends State<Otp> {
           final cooldown = (res['cooldownSeconds'] as num?)?.toInt() ?? 60;
           _startTimer(cooldown);
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('New OTP sent to your number')),
-          );
+          AppToast.success(context, 'New OTP sent to your number');
         } catch (e) {
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(e.toString().replaceAll('ValidationFailure: ', '').replaceAll('NetworkFailure: ', ''))),
-          );
+          AppToast.error(context, e.toString().replaceAll('ValidationFailure: ', '').replaceAll('NetworkFailure: ', ''));
         }
       }
     }
@@ -160,9 +157,7 @@ class _OtpState extends State<Otp> {
     } catch (e) {
       if (!mounted) return;
       setState(() => hasError = true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString().replaceAll('ValidationFailure: ', '').replaceAll('NetworkFailure: ', ''))),
-      );
+      AppToast.error(context, e.toString().replaceAll('ValidationFailure: ', '').replaceAll('NetworkFailure: ', ''));
     } finally {
       if (mounted) setState(() => _isVerifying = false);
     }

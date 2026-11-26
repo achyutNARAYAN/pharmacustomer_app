@@ -8,6 +8,7 @@ import '../../core/providers/cart_notifier.dart';
 import '../../core/providers/profile_notifier.dart';
 import '../../core/services/api_service.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../core/utils/address_coordinate_resolver.dart';
 import '../../core/widgets/customer_support_sheet.dart';
 import '../orders/providers/orders_provider.dart';
@@ -894,5 +895,5 @@ class _LiveTrackingState extends State<LiveTracking> {
   }
 
   void _message(BuildContext context, String text) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+      AppToast.show(context, text);
 }

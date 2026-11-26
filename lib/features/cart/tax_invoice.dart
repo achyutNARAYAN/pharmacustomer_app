@@ -10,6 +10,7 @@ import '../../core/models/cart_item.dart';
 import '../../core/providers/cart_notifier.dart';
 import '../../core/providers/profile_notifier.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/app_toast.dart';
 import '../orders/providers/orders_provider.dart';
 import '../profile/providers/customer_address_provider.dart';
 
@@ -330,15 +331,11 @@ class TaxInvoice extends StatelessWidget {
           allocatedStore: effectiveStore,
         );
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Invoice saved to ${file.path}')),
-          );
+          AppToast.success(context, 'Invoice saved to ${file.path}');
         }
       } catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to save invoice: $e')),
-          );
+          AppToast.error(context, 'Failed to save invoice: $e');
         }
       }
     }

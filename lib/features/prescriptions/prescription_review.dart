@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../../core/errors/failures.dart';
 import '../../core/services/api_service.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/app_toast.dart';
 import '../auth/providers/auth_provider.dart';
 import 'prescription_upload_sheet.dart';
 import 'providers/prescription_provider.dart';
@@ -556,24 +557,7 @@ class _PrescriptionReviewState extends State<PrescriptionReview> {
       final message = e is Failure
           ? e.message
           : e.toString().replaceAll('Exception: ', '').replaceAll('ValidationFailure: ', '');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.error_outline, color: Colors.white, size: 20),
-              const SizedBox(width: 8),
-              Expanded(child: Text('Upload failed: $message')),
-            ],
-          ),
-          backgroundColor: AppTheme.error,
-          behavior: SnackBarBehavior.floating,
-          action: SnackBarAction(
-            label: 'Retry',
-            textColor: Colors.white,
-            onPressed: _submit,
-          ),
-        ),
-      );
+      AppToast.error(context, 'Upload failed: $message');
       return;
     }
 

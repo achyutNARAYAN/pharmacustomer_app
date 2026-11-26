@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/app_toast.dart';
 import '../prescriptions/prescription_vault.dart';
 import 'models/patient_profile.dart';
 import 'providers/patient_profiles_provider.dart';
@@ -163,13 +164,7 @@ class _ProfilesView extends StatelessWidget {
           p.relation == value.relation,
     );
     if (duplicate) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'A profile with this name and relation already exists.',
-          ),
-        ),
-      );
+      AppToast.error(context, 'A profile with this name and relation already exists.');
     }
     final occupiedRelation = state.profiles.any(
       (p) =>
@@ -179,13 +174,7 @@ class _ProfilesView extends StatelessWidget {
               value.relation == PatientRelation.mother),
     );
     if (occupiedRelation) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Only one ${value.relation.label} profile can be saved.',
-          ),
-        ),
-      );
+      AppToast.error(context, 'Only one ${value.relation.label} profile can be saved.');
       return;
     }
     await state.save(value, add: current == null);

@@ -7,6 +7,7 @@ import '../../core/providers/cart_notifier.dart';
 import '../../core/providers/profile_notifier.dart';
 import '../../core/services/api_service.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/app_toast.dart';
 import '../prescriptions/prescription_review.dart';
 import '../prescriptions/prescription_upload_sheet.dart';
 import '../prescriptions/providers/prescription_provider.dart';
@@ -211,13 +212,9 @@ class _MedicineDetailState extends State<MedicineDetail> {
                         }
                       }
 
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('$_quantity × ${_medicine.name} added to cart'),
-                          backgroundColor: AppTheme.primary,
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
+                      AppToast.cart(
+                        context,
+                        '$_quantity × ${_medicine.name} added to cart',
                       );
                     },
                     style: ElevatedButton.styleFrom(

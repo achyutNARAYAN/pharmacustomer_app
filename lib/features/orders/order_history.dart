@@ -6,6 +6,7 @@ import '../../core/errors/failures.dart';
 import '../../core/models/cart_item.dart';
 import '../../core/providers/cart_notifier.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/customer_support_sheet.dart';
 import '../cart/cart.dart';
 import '../cart/live_tracking.dart';
@@ -96,23 +97,15 @@ class _OrderHistoryState extends State<OrderHistory> with WidgetsBindingObserver
       ));
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${order.items.length} medicines added to your cart'),
-        backgroundColor: AppTheme.primaryDark,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        action: SnackBarAction(
-          label: 'VIEW CART',
-          textColor: const Color(0xFFFDE047),
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute<void>(builder: (_) => const Cart()),
-            );
-          },
-        ),
-      ),
+    AppToast.cart(
+      context,
+      '${order.items.length} medicines added to your cart',
+      onViewCart: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute<void>(builder: (_) => const Cart()),
+        );
+      },
     );
   }
 
@@ -229,20 +222,13 @@ class _OrderHistoryState extends State<OrderHistory> with WidgetsBindingObserver
                             );
                             if (dialogCtx.mounted) Navigator.pop(dialogCtx);
                             if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Order cancelled successfully.'),
-                                  backgroundColor: AppTheme.primaryDark,
-                                ),
-                              );
+                              AppToast.success(context, 'Order cancelled successfully.');
                             }
                           } catch (e) {
                             setSheetState(() => isSubmitting = false);
                             final msg = e is Failure ? e.message : e.toString().replaceFirst('Exception: ', '');
                             if (dialogCtx.mounted) {
-                              ScaffoldMessenger.of(dialogCtx).showSnackBar(
-                                SnackBar(content: Text(msg), backgroundColor: Colors.red.shade800),
-                              );
+                              AppToast.error(dialogCtx, msg);
                             }
                           }
                         },
@@ -671,27 +657,6 @@ class _OrderHistoryState extends State<OrderHistory> with WidgetsBindingObserver
             tooltip: '24x7 Help & Support',
             onPressed: () => showCustomerSupportSheet(context),
           ),
-          if (orders.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppTheme.surfaceLow,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '${orders.length}',
-                    style: const TextStyle(
-                      color: AppTheme.primaryDark,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ),
-            ),
         ],
       ),
       body: RefreshIndicator(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'app_toast.dart';
 
 import '../theme.dart';
 
@@ -143,16 +144,11 @@ class _CustomerSupportModalState extends State<_CustomerSupportModal> {
 
   void _fallbackCopy(String message) {
     Clipboard.setData(const ClipboardData(text: _displayTollFree));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        action: SnackBarAction(
-          label: 'OK',
-          onPressed: () {},
-        ),
-      ),
+    AppToast.show(
+      context,
+      message,
+      icon: Icons.phone_in_talk_rounded,
+      actionLabel: 'OK',
     );
   }
 

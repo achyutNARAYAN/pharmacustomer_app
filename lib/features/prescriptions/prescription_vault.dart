@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/providers/cart_notifier.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/customer_support_sheet.dart';
 import '../home/search.dart';
 import 'prescription_review.dart';
@@ -175,9 +176,6 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
             subtitle: 'Prescription ${p.id.length > 8 ? p.id.substring(0, 8) : p.id}',
             date: 'Added ${_formatDate(p.createdAt)}',
             status: p.status.chipLabel,
-            medicines: [
-              (p.fileName, '${(p.sizeBytes / 1024).toStringAsFixed(1)} KB'),
-            ],
           ),
         ),
       ),
@@ -306,7 +304,7 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
     required String subtitle,
     required String date,
     required String status,
-    required List<(String, String)> medicines,
+    List<(String, String)> medicines = const [],
     String? rxId,
     PrescriptionStatus rxStatus = PrescriptionStatus.approved,
   }) => Container(
@@ -345,77 +343,69 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
             _pill(status, const Color(0xFFE5F5EE), const Color(0xFF168457)),
           ],
         ),
-        const Divider(height: 12),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFFEAF9FD),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        const Divider(height: 14),
+        const SizedBox(height: 4),
+        const Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Linked Prescribed Medications',
+              style: TextStyle(
+                fontSize: 11,
+                color: AppTheme.textSecondary,
+              ),
+            ),
+            Text(
+              'Dosage Refills Available',
+              style: TextStyle(
+                fontSize: 11,
+                color: AppTheme.primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        if (medicines.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          ...medicines.map(
+            (item) => Container(
+              margin: const EdgeInsets.only(top: 6),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 10,
+              ),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceLow,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Row(
                 children: [
-                  Text(
-                    'Linked Prescribed Medications',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppTheme.textSecondary,
+                  const Icon(
+                    Icons.medication_outlined,
+                    size: 15,
+                    color: AppTheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      item.$1,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                  Text(
-                    'Dosage Refills Available',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppTheme.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  _pill(
+                    item.$2,
+                    const Color(0xFFD9F5FA),
+                    AppTheme.textSecondary,
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              ...medicines.map(
-                (item) => Container(
-                  margin: const EdgeInsets.only(top: 6),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 9,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.medication_outlined,
-                        size: 15,
-                        color: AppTheme.primary,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          item.$1,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      _pill(
-                        item.$2,
-                        const Color(0xFFD9F5FA),
-                        AppTheme.textSecondary,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
+        ],
         const SizedBox(height: 16),
         SizedBox(
           width: double.infinity,
@@ -990,12 +980,7 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
       setState(() {
         _tab = 2;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Prescription moved to Past & Expired.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      AppToast.info(context, 'Prescription moved to Past & Expired.');
     },
     onDelete: () async {
       if (rxId != null) {
@@ -1008,29 +993,19 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
           await cart?.removePrescriptionId();
         }
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(
-                  success ? Icons.delete_sweep_rounded : Icons.info_outline,
-                  color: Colors.white,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    success
-                        ? 'Prescription deleted permanently.'
-                        : (res?.message ?? 'Could not delete prescription from server.'),
-                  ),
-                ),
-              ],
-            ),
-            backgroundColor: success ? Colors.redAccent : Colors.orange.shade800,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        if (success) {
+          AppToast.show(
+            context,
+            'Prescription deleted permanently.',
+            icon: Icons.delete_sweep_rounded,
+            iconColor: const Color(0xFFFCA5A5),
+          );
+        } else {
+          AppToast.error(
+            context,
+            res?.message ?? 'Could not delete prescription from server.',
+          );
+        }
       }
     },
   );

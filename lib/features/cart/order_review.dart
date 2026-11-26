@@ -7,6 +7,7 @@ import '../../core/providers/profile_notifier.dart';
 import '../../core/services/api_service.dart';
 import '../../core/theme.dart';
 import '../../core/utils/pincode_validator.dart';
+import '../../core/widgets/app_toast.dart';
 import '../profile/providers/customer_address_provider.dart';
 import 'address.dart';
 import 'payment_processing.dart';
@@ -302,13 +303,7 @@ class OrderReview extends StatelessWidget {
               } catch (e) {
                 if (!context.mounted) return;
                 final msg = e is Failure ? e.message : e.toString();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(msg),
-                    backgroundColor: Colors.red.shade800,
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
+                AppToast.error(context, msg);
                 return;
               }
               if (!context.mounted) return;
