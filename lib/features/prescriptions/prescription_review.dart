@@ -1,6 +1,7 @@
-import 'dart:typed_data';
+import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
@@ -42,11 +43,16 @@ class PrescriptionReview extends StatefulWidget {
 }
 
 class _PrescriptionReviewState extends State<PrescriptionReview> {
+  static const int _maxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
+  static const int _maxPreviewPdfPages = 15;
+
   late final List<PlatformFile> _files = [widget.file];
-  late final List<Future<Uint8List>?> _pdfPreviews = [
-    _loadPdfPreview(widget.file),
+  late final List<Future<List<Uint8List>>?> _pdfPagesFutures = [
+    _loadPdfPages(widget.file),
   ];
   int _selectedPage = 0;
+  int _selectedPdfPage = 0;
+  final PageController _pdfPageController = PageController();
   bool _isSubmitting = false;
 
   bool get _isImage => const [
@@ -55,6 +61,12 @@ class _PrescriptionReviewState extends State<PrescriptionReview> {
     '.jpeg',
     '.webp',
   ].any(_files[_selectedPage].name.toLowerCase().endsWith);
+
+  @override
+  void dispose() {
+    _pdfPageController.dispose();
+    super.dispose();
+  }
 
   // ── Build ──────────────────────────────────────────────────────────────────
 
@@ -169,7 +181,7 @@ class _PrescriptionReviewState extends State<PrescriptionReview> {
                       ),
                     ),
                     Text(
-                      'Page ${_selectedPage + 1} of ${_files.length} • Tap to review',
+                      'File ${_selectedPage + 1} of ${_files.length} • ${_formatBytes(_files[_selectedPage].size)}',
                       style: const TextStyle(
                         fontSize: 11,
                         color: AppTheme.mutedText,
@@ -204,7 +216,7 @@ class _PrescriptionReviewState extends State<PrescriptionReview> {
           borderRadius: const BorderRadius.vertical(
             bottom: Radius.circular(20),
           ),
-          child: AspectRatio(aspectRatio: .78, child: _preview()),
+          child: _previewSection(),
         ),
       ],
     ),
@@ -267,7 +279,7 @@ class _PrescriptionReviewState extends State<PrescriptionReview> {
       clipBehavior: Clip.none,
       children: [
         GestureDetector(
-          onTap: () => setState(() => _selectedPage = i),
+          onTap: () => _selectFile(i),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 160),
             width: _kThumbnailW,
@@ -407,48 +419,190 @@ class _PrescriptionReviewState extends State<PrescriptionReview> {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
-  Widget _preview() {
-    final file = _files[_selectedPage];
-    if (_isImage && file.bytes != null) {
-      return Image.memory(
-        file.bytes!,
-        fit: BoxFit.contain,
-        errorBuilder: (_, _, _) => _placeholder(),
-      );
+  String _formatBytes(int bytes) {
+    if (bytes >= 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
     }
-    if (_pdfPreviews[_selectedPage] case final preview?) {
-      return FutureBuilder<Uint8List>(
-        future: preview,
+    if (bytes >= 1024) {
+      return '${(bytes / 1024).toStringAsFixed(0)} KB';
+    }
+    return '$bytes B';
+  }
+
+  void _selectFile(int index) {
+    if (index == _selectedPage) return;
+    setState(() {
+      _selectedPage = index;
+      _selectedPdfPage = 0;
+    });
+    if (_pdfPageController.hasClients) {
+      _pdfPageController.jumpToPage(0);
+    }
+  }
+
+  Widget _previewSection() {
+    final file = _files[_selectedPage];
+    if (_isImage) {
+      if (file.bytes != null) {
+        return AspectRatio(
+          aspectRatio: .78,
+          child: Image.memory(
+            file.bytes!,
+            fit: BoxFit.contain,
+            errorBuilder: (_, _, _) => _placeholder(),
+          ),
+        );
+      }
+      if (!kIsWeb && file.path != null) {
+        return AspectRatio(
+          aspectRatio: .78,
+          child: Image.file(
+            File(file.path!),
+            fit: BoxFit.contain,
+            errorBuilder: (_, _, _) => _placeholder(),
+          ),
+        );
+      }
+    }
+
+    if (_pdfPagesFutures[_selectedPage] case final pagesFuture?) {
+      return FutureBuilder<List<Uint8List>>(
+        future: pagesFuture,
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return _previewMessage(
-              'Could not render this PDF.\nYou can still submit it for pharmacist review.',
-            );
-          }
-          if (!snapshot.hasData) {
-            return const Center(
-              child: CircularProgressIndicator(
-                color: AppTheme.primary,
-                strokeWidth: 2,
+            return AspectRatio(
+              aspectRatio: .78,
+              child: _previewMessage(
+                'Could not render this PDF.\nYou can still submit it for pharmacist review.',
               ),
             );
           }
-          return Image.memory(snapshot.data!, fit: BoxFit.contain);
+          if (!snapshot.hasData) {
+            return const AspectRatio(
+              aspectRatio: .78,
+              child: Center(
+                child: CircularProgressIndicator(
+                  color: AppTheme.primary,
+                  strokeWidth: 2,
+                ),
+              ),
+            );
+          }
+          final pages = snapshot.data!;
+          if (pages.isEmpty) {
+            return AspectRatio(
+              aspectRatio: .78,
+              child: _previewMessage(
+                'Could not render this PDF.\nYou can still submit it for pharmacist review.',
+              ),
+            );
+          }
+          if (pages.length == 1) {
+            return AspectRatio(
+              aspectRatio: .78,
+              child: Image.memory(pages.first, fit: BoxFit.contain),
+            );
+          }
+
+          final currentPdfPage = _selectedPdfPage.clamp(0, pages.length - 1);
+          return Column(
+            children: [
+              AspectRatio(
+                aspectRatio: .78,
+                child: PageView.builder(
+                  controller: _pdfPageController,
+                  itemCount: pages.length,
+                  onPageChanged: (pageIndex) {
+                    setState(() => _selectedPdfPage = pageIndex);
+                  },
+                  itemBuilder: (_, pageIndex) => Image.memory(
+                    pages[pageIndex],
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF6FBFD),
+                  border: Border(top: BorderSide(color: AppTheme.outlineBorder)),
+                ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      tooltip: 'Previous PDF page',
+                      onPressed: currentPdfPage > 0
+                          ? () => _pdfPageController.previousPage(
+                                duration: const Duration(milliseconds: 220),
+                                curve: Curves.easeOut,
+                              )
+                          : null,
+                      icon: const Icon(Icons.chevron_left_rounded),
+                    ),
+                    Expanded(
+                      child: Column(
+                        children: [
+                          Text(
+                            'PDF Page ${currentPdfPage + 1} of ${pages.length}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.primaryDark,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          const Text(
+                            'Swipe left/right • All pages submitted together',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: AppTheme.mutedText,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      tooltip: 'Next PDF page',
+                      onPressed: currentPdfPage < pages.length - 1
+                          ? () => _pdfPageController.nextPage(
+                                duration: const Duration(milliseconds: 220),
+                                curve: Curves.easeOut,
+                              )
+                          : null,
+                      icon: const Icon(Icons.chevron_right_rounded),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
         },
       );
     }
-    return _placeholder();
+
+    return AspectRatio(aspectRatio: .78, child: _placeholder());
   }
 
-  Future<Uint8List>? _loadPdfPreview(PlatformFile file) {
-    if (!file.name.toLowerCase().endsWith('.pdf') || file.bytes == null) {
+  Future<List<Uint8List>>? _loadPdfPages(PlatformFile file) {
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
       return null;
     }
-    return Printing.raster(
-      file.bytes!,
-      pages: const [0],
-      dpi: 180,
-    ).first.then((p) => p.toPng());
+    return () async {
+      Uint8List? bytes = file.bytes;
+      if (bytes == null && !kIsWeb && file.path != null) {
+        bytes = await File(file.path!).readAsBytes();
+      }
+      if (bytes == null) return <Uint8List>[];
+
+      final pages = <Uint8List>[];
+      await for (final raster in Printing.raster(bytes, dpi: 150)) {
+        pages.add(await raster.toPng());
+        if (pages.length >= _maxPreviewPdfPages) break;
+      }
+      return pages;
+    }();
   }
 
   Widget _previewMessage(String message) => Container(
@@ -492,25 +646,40 @@ class _PrescriptionReviewState extends State<PrescriptionReview> {
     if (!mounted || file == null) return;
     setState(() {
       _files.add(file);
-      _pdfPreviews.add(_loadPdfPreview(file));
+      _pdfPagesFutures.add(_loadPdfPages(file));
       _selectedPage = _files.length - 1;
+      _selectedPdfPage = 0;
     });
+    if (_pdfPageController.hasClients) {
+      _pdfPageController.jumpToPage(0);
+    }
   }
 
   void _removePage(int i) {
     setState(() {
       _files.removeAt(i);
-      _pdfPreviews.removeAt(i);
+      _pdfPagesFutures.removeAt(i);
       if (_selectedPage >= _files.length) _selectedPage = _files.length - 1;
+      _selectedPdfPage = 0;
     });
+    if (_pdfPageController.hasClients) {
+      _pdfPageController.jumpToPage(0);
+    }
   }
 
   Future<void> _submit() async {
     if (_files.isEmpty || _isSubmitting) return;
 
+    final primaryFile = _files[_selectedPage.clamp(0, _files.length - 1)];
+    if (primaryFile.size > _maxFileSizeBytes) {
+      AppToast.error(context, 'Prescription file must be 10 MB or smaller.');
+      return;
+    }
+
     setState(() => _isSubmitting = true);
 
-    final primaryFile = _files[_selectedPage.clamp(0, _files.length - 1)];
+    final isPdf = primaryFile.extension?.toLowerCase() == 'pdf' ||
+        primaryFile.name.toLowerCase().endsWith('.pdf');
     final patientName = widget.patientName.trim().isNotEmpty
         ? widget.patientName.trim()
         : 'Customer';
@@ -528,9 +697,7 @@ class _PrescriptionReviewState extends State<PrescriptionReview> {
           prescriptionDate: DateTime.now(),
           documentUrl: primaryFile.path ?? 'https://res.cloudinary.com/demo/sample_rx.pdf',
           fileSize: primaryFile.size,
-          mimeType: primaryFile.extension?.toLowerCase() == 'pdf'
-              ? 'application/pdf'
-              : 'image/jpeg',
+          mimeType: isPdf ? 'application/pdf' : 'image/jpeg',
         );
 
         if (res != null) {
@@ -567,9 +734,7 @@ class _PrescriptionReviewState extends State<PrescriptionReview> {
       source: 'upload',
       status: PrescriptionStatus.underReview,
       fileName: primaryFile.name,
-      mime: primaryFile.extension?.toLowerCase() == 'pdf'
-          ? 'application/pdf'
-          : 'image/jpeg',
+      mime: isPdf ? 'application/pdf' : 'image/jpeg',
       sizeBytes: primaryFile.size,
       remoteUrl: primaryFile.path,
       createdAt: DateTime.now(),

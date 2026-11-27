@@ -39,7 +39,9 @@ class CustomerAddressCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: isSelected
-                  ? AppTheme.primary
+                  ? (address.isDefault
+                      ? const Color(0xFFE65100)
+                      : AppTheme.primary)
                   : const Color(0xFFE2EFF2),
               width: isSelected ? 2 : 1.2,
             ),
@@ -85,32 +87,6 @@ class CustomerAddressCard extends StatelessWidget {
                             ],
                           ),
                         ),
-
-                        // Default Badge
-                        if (address.isDefault)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFF3E0),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: const Color(0xFFFFB74D), width: 0.8),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.star_rounded, size: 12, color: Color(0xFFE65100)),
-                                SizedBox(width: 3),
-                                Text(
-                                  'DEFAULT',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFFE65100),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
 
                         // Serviceability Pill
                         Container(
@@ -243,31 +219,75 @@ class CustomerAddressCard extends StatelessWidget {
               const Divider(height: 1, color: Color(0xFFEDF5F7)),
               const SizedBox(height: 8),
 
-              // Contact Details & Default button
+              // Contact Details & Default badge/button
               Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   const Icon(Icons.person_outline, size: 16, color: AppTheme.primary),
                   const SizedBox(width: 6),
                   Expanded(
-                    child: Text(
-                      '${address.contactName} (${address.contactMobile})',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.text,
-                      ),
-                      overflow: TextOverflow.ellipsis,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          address.contactName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.text,
+                          ),
+                        ),
+                        if (address.contactMobile.trim().isNotEmpty) ...[
+                          const SizedBox(height: 1),
+                          Text(
+                            address.contactMobile,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
-
-                  // Set as default button (if not default)
-                  if (!address.isDefault && onSetDefault != null)
+                  const SizedBox(width: 8),
+                  if (address.isDefault)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF3E0),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFFFFB74D), width: 0.8),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.star_rounded, size: 12, color: Color(0xFFE65100)),
+                          SizedBox(width: 3),
+                          Text(
+                            'DEFAULT',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFFE65100),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else if (onSetDefault != null)
                     TextButton.icon(
                       onPressed: onSetDefault,
                       icon: const Icon(Icons.star_border_rounded, size: 15),
                       label: const Text('Set as default'),
                       style: TextButton.styleFrom(
                         visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         foregroundColor: AppTheme.primary,
                         textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                       ),

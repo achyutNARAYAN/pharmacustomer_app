@@ -140,14 +140,7 @@ class _AddressManagementViewState extends State<_AddressManagementView> {
       backgroundColor: AppTheme.background,
       appBar: AppBar(
         centerTitle: true,
-        title: const Text('Customer Address Management'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add_location_alt_outlined),
-            tooltip: 'Add new address',
-            onPressed: _openAddAddress,
-          ),
-        ],
+        title: const Text('Saved Addresses'),
       ),
       body: Consumer<CustomerAddressProvider>(
         builder: (context, provider, _) {
@@ -161,7 +154,7 @@ class _AddressManagementViewState extends State<_AddressManagementView> {
           return RefreshIndicator(
             onRefresh: provider.refresh,
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
               children: [                // Type Filter Chips: ALL | HOME | WORK | OTHER
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
@@ -261,14 +254,15 @@ class _AddressManagementViewState extends State<_AddressManagementView> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openAddAddress,
-        backgroundColor: AppTheme.primary,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add_location_alt_rounded),
-        label: const Text(
-          'Add New Address',
-          style: TextStyle(fontWeight: FontWeight.w700),
+      bottomNavigationBar: SafeArea(
+        minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        child: ElevatedButton.icon(
+          onPressed: _openAddAddress,
+          icon: const Icon(Icons.add_location_alt_rounded),
+          label: const Text(
+            'Add New Address',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
         ),
       ),
     );

@@ -42,6 +42,7 @@ class _SearchState extends State<Search> {
   bool _filterColdChain = false;
   List<Medicine> _liveMedicines = [];
   bool _isSearching = false;
+  String _lastCompletedQuery = '';
 
   @override
   void initState() {
@@ -51,25 +52,26 @@ class _SearchState extends State<Search> {
   }
 
   void _onSearchChanged(String val) {
-    setState(() {});
     _debounceTimer?.cancel();
     final trimmed = val.trim();
     if (trimmed.isEmpty) {
       setState(() {
         _liveMedicines = [];
         _isSearching = false;
+        _lastCompletedQuery = '';
       });
       return;
     }
+    setState(() => _isSearching = true);
     _debounceTimer = Timer(const Duration(milliseconds: 350), () {
       _fetchLiveMedicines(trimmed);
     });
   }
 
   void _selectTrendingQuery(String text) {
+    _debounceTimer?.cancel();
     _searchController.text = text;
-    _onSearchChanged(text);
-    _fetchLiveMedicines(text);
+    _fetchLiveMedicines(text.trim());
   }
 
   Future<void> _fetchLiveMedicines(String query) async {
@@ -80,10 +82,13 @@ class _SearchState extends State<Search> {
       if (mounted && currentRequestId == _searchRequestId) {
         setState(() {
           _liveMedicines = items.map((m) => Medicine.fromJson(m)).toList();
+          _lastCompletedQuery = query;
         });
       }
     } catch (_) {
-      // Fallback gracefully to default items if offline
+      if (mounted && currentRequestId == _searchRequestId) {
+        _lastCompletedQuery = query;
+      }
     } finally {
       if (mounted && currentRequestId == _searchRequestId) {
         setState(() => _isSearching = false);
@@ -132,6 +137,7 @@ class _SearchState extends State<Search> {
                 setState(() {
                   _liveMedicines = [];
                   _isSearching = false;
+                  _lastCompletedQuery = '';
                 });
               }
             },
@@ -158,6 +164,7 @@ class _SearchState extends State<Search> {
                           _searchController.clear();
                           _liveMedicines = [];
                           _isSearching = false;
+                          _lastCompletedQuery = '';
                         });
                       },
                     ),
@@ -215,7 +222,7 @@ class _SearchState extends State<Search> {
     if (query.isEmpty) {
       return _buildBrowseCategoriesView();
     }
-    if (_isSearching) {
+    if (_isSearching || _lastCompletedQuery != query) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(32),

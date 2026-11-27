@@ -22,6 +22,7 @@ class _PrescriptionUploadSheet extends StatefulWidget {
 }
 
 class _PrescriptionUploadSheetState extends State<_PrescriptionUploadSheet> {
+  static const int _maxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
   bool _consent = false;
   bool _picking = false;
 
@@ -35,8 +36,8 @@ class _PrescriptionUploadSheetState extends State<_PrescriptionUploadSheet> {
           final size = await image.length();
           if (!mounted) return;
           final file = PlatformFile(name: image.name, path: image.path, size: size);
-          if (file.size > 15 * 1024 * 1024) {
-            AppToast.error(context, 'Choose a file smaller than 15 MB.');
+          if (file.size > _maxFileSizeBytes) {
+            AppToast.error(context, 'Choose a file smaller than 10 MB.');
           } else {
             Navigator.pop(context, file);
           }
@@ -52,8 +53,8 @@ class _PrescriptionUploadSheetState extends State<_PrescriptionUploadSheet> {
       if (!mounted) return;
       final file = result?.files.firstOrNull;
       if (file != null) {
-        if (file.size > 15 * 1024 * 1024) {
-          AppToast.error(context, 'Choose a file smaller than 15 MB.');
+        if (file.size > _maxFileSizeBytes) {
+          AppToast.error(context, 'Choose a file smaller than 10 MB.');
         } else {
           Navigator.pop(context, file);
         }
@@ -152,7 +153,7 @@ class _PrescriptionUploadSheetState extends State<_PrescriptionUploadSheet> {
                 child: _method(
                   Icons.description_outlined,
                   'Upload PDF',
-                  'Prescription file',
+                  'Multi-page · Max 10 MB',
                   () => _pick(pdf: true),
                 ),
               ),

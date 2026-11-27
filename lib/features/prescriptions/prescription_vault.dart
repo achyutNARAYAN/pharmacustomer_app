@@ -177,17 +177,26 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
     padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
     children: [
       ...list.map(
-        (p) => Padding(
-          padding: const EdgeInsets.only(bottom: 14),
-          child: _prescriptionCard(
-            rxId: p.id,
-            rxStatus: p.status,
-            name: p.doctorName ?? 'Consulting Physician',
-            subtitle: 'ID: #${p.id.length > 8 ? p.id.substring(0, 8) : p.id} • Valid 6 months',
-            date: _formatDate(p.createdAt),
-            status: p.status.chipLabel,
-          ),
-        ),
+        (p) {
+          final shortId = p.id.length > 8 ? p.id.substring(0, 8) : p.id;
+          final displayTitle = (p.doctorName != null && p.doctorName!.trim().isNotEmpty)
+              ? p.doctorName!.trim()
+              : (p.fileName.trim().isNotEmpty ? p.fileName.trim() : 'Uploaded Prescription');
+          final subtitle = p.status == PrescriptionStatus.approved
+              ? 'ID: #$shortId • Valid 1 month'
+              : 'ID: #$shortId • Uploaded ${_formatDate(p.createdAt)}';
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: _prescriptionCard(
+              rxId: p.id,
+              rxStatus: p.status,
+              name: displayTitle,
+              subtitle: subtitle,
+              date: _formatDate(p.createdAt),
+              status: p.status.chipLabel,
+            ),
+          );
+        },
       ),
     ],
   );
@@ -332,7 +341,7 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
     String? rxId,
     PrescriptionStatus rxStatus = PrescriptionStatus.approved,
   }) {
-    final isVerified = rxStatus == PrescriptionStatus.approved || rxStatus == PrescriptionStatus.uploaded;
+    final isApproved = rxStatus == PrescriptionStatus.approved;
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -394,28 +403,20 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              name,
-                              style: const TextStyle(
-                                fontSize: 14.5,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.text,
-                                letterSpacing: -0.2,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.verified_rounded, size: 14, color: Color(0xFF0D9488)),
-                        ],
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.text,
+                          letterSpacing: -0.2,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'For ${widget.patientName} • MD Physician',
+                        'For ${widget.patientName}',
                         style: const TextStyle(
                           fontSize: 11,
                           color: AppTheme.mutedText,
@@ -436,13 +437,14 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
                     ],
                   ),
                 ),
+                const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: isVerified ? const Color(0xFFE6F4EA) : const Color(0xFFFEF3C7),
+                    color: isApproved ? const Color(0xFFE6F4EA) : const Color(0xFFFEF3C7),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: isVerified ? const Color(0xFFA7F3D0) : const Color(0xFFFDE68A),
+                      color: isApproved ? const Color(0xFFA7F3D0) : const Color(0xFFFDE68A),
                     ),
                   ),
                   child: Row(
@@ -452,7 +454,7 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
                         width: 5,
                         height: 5,
                         decoration: BoxDecoration(
-                          color: isVerified ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                          color: isApproved ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -462,7 +464,7 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
                         style: TextStyle(
                           fontSize: 9,
                           fontWeight: FontWeight.bold,
-                          color: isVerified ? const Color(0xFF065F46) : const Color(0xFF92400E),
+                          color: isApproved ? const Color(0xFF065F46) : const Color(0xFF92400E),
                           letterSpacing: 0.3,
                         ),
                       ),
@@ -606,7 +608,9 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
           (p) => Padding(
             padding: const EdgeInsets.only(bottom: 14),
             child: _archiveCard(
-              p.doctorName ?? 'Consulting Physician',
+              (p.doctorName != null && p.doctorName!.trim().isNotEmpty)
+                  ? p.doctorName!.trim()
+                  : (p.fileName.trim().isNotEmpty ? p.fileName.trim() : 'Uploaded Prescription'),
               'Prescription ${p.id.length > 8 ? p.id.substring(0, 8) : p.id}',
               'Expired on ${_formatDate(p.createdAt)}',
               p.fileName,
