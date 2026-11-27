@@ -13,10 +13,8 @@ class SavedPatientProfilesScreen extends StatelessWidget {
   const SavedPatientProfilesScreen({
     super.key,
     required this.userName,
-    this.profileImagePath,
   });
   final String userName;
-  final String? profileImagePath;
 
   @override
   Widget build(BuildContext context) => ChangeNotifierProvider(
@@ -24,15 +22,13 @@ class SavedPatientProfilesScreen extends StatelessWidget {
         PatientProfilesProvider(ApiServicePatientRepository(userName))..refresh(),
     child: _ProfilesView(
       userName: userName,
-      profileImagePath: profileImagePath,
     ),
   );
 }
 
 class _ProfilesView extends StatelessWidget {
-  const _ProfilesView({required this.userName, this.profileImagePath});
+  const _ProfilesView({required this.userName});
   final String userName;
-  final String? profileImagePath;
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -93,7 +89,6 @@ class _ProfilesView extends StatelessWidget {
                   ),
                   child: PatientProfileCard(
                     profile: profile,
-                    photoPath: profile.isSelf ? profileImagePath : null,
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute<void>(
@@ -101,9 +96,6 @@ class _ProfilesView extends StatelessWidget {
                           patientName: profile.name,
                           patientId: profile.id,
                           allergies: profile.allergies,
-                          profileImagePath: profile.isSelf
-                              ? profileImagePath
-                              : null,
                         ),
                       ),
                     ),

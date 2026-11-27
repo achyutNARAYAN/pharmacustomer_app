@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -20,14 +18,12 @@ import 'widgets/trending_card.dart';
 class Home extends StatefulWidget {
   final String name;
   final String location;
-  final String? profileImagePath;
   final ValueChanged<PlatformFile>? onPrescriptionUpload;
 
   const Home({
     super.key,
     required this.name,
     this.location = 'Set delivery location',
-    this.profileImagePath,
     this.onPrescriptionUpload,
   });
 
@@ -207,40 +203,19 @@ class _HomeState extends State<Home> {
   // ── Section builders ───────────────────────────────────────────────────────
 
   Widget _welcomeRow(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('WELCOME BACK',
-                style: Theme.of(context)
-                    .textTheme
-                    .labelSmall
-                    ?.copyWith(color: AppTheme.mutedText, letterSpacing: 1)),
-            const SizedBox(height: 4),
-            ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width - 100),
-              child: Text('$_greeting, ${widget.name}',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize: 20, height: 1.15)),
-            ),
-          ],
-        ),
-        Container(
-          padding: const EdgeInsets.all(3),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: AppTheme.primary.withValues(alpha: 0.4), width: 2),
-          ),
-          child: CircleAvatar(
-            radius: 23,
-            backgroundColor: AppTheme.primaryContainer,
-            backgroundImage: widget.profileImagePath == null ? null : FileImage(File(widget.profileImagePath!)),
-            child: widget.profileImagePath == null ? const Icon(Icons.person, color: AppTheme.primary) : null,
-          ),
-        ),
+        Text('WELCOME BACK',
+            style: Theme.of(context)
+                .textTheme
+                .labelSmall
+                ?.copyWith(color: AppTheme.mutedText, letterSpacing: 1)),
+        const SizedBox(height: 4),
+        Text('$_greeting, ${widget.name}',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize: 20, height: 1.15)),
       ],
     );
   }
@@ -276,7 +251,7 @@ class _HomeState extends State<Home> {
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const Search()),
+        MaterialPageRoute(builder: (_) => const Search(autoFocus: true)),
       ),
       child: Container(
         height: 54,

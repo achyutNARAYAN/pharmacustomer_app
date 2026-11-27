@@ -72,7 +72,7 @@ class ProfileNotifier extends ChangeNotifier {
     required String address,
     required String workAddress,
     required String parentsAddress,
-    required String? profileImagePath,
+    String? profileImagePath,
   }) {
     this.name = name;
     this.phoneNumber = phoneNumber;
@@ -90,7 +90,7 @@ class ProfileNotifier extends ChangeNotifier {
     required String address,
     required String workAddress,
     required String parentsAddress,
-    required String? profileImagePath,
+    String? profileImagePath,
   }) {
     initialize(
       name: name,

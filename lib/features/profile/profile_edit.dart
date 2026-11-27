@@ -1,7 +1,4 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'customer_address_screen.dart';
 
 import '../../core/theme.dart';
@@ -15,7 +12,7 @@ class ProfileDetails {
     required this.address,
     required this.workAddress,
     required this.parentsAddress,
-    required this.profileImagePath,
+    this.profileImagePath,
   });
 
   final String name;
@@ -46,7 +43,6 @@ class _ProfileEditState extends State<ProfileEdit> {
   late final _address = TextEditingController(text: widget.details.address);
   late final _workAddress = TextEditingController(text: widget.details.workAddress);
   late final _parentsAddress = TextEditingController(text: widget.details.parentsAddress);
-  late String? _imagePath = widget.details.profileImagePath;
 
   @override
   void dispose() {
@@ -57,11 +53,6 @@ class _ProfileEditState extends State<ProfileEdit> {
     _workAddress.dispose();
     _parentsAddress.dispose();
     super.dispose();
-  }
-
-  Future<void> _pickImage() async {
-    final image = await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (image != null && mounted) setState(() => _imagePath = image.path);
   }
 
   void _save() {
@@ -76,7 +67,6 @@ class _ProfileEditState extends State<ProfileEdit> {
       address: _address.text.trim(),
       workAddress: _workAddress.text.trim(),
       parentsAddress: _parentsAddress.text.trim(),
-      profileImagePath: _imagePath,
     ));
   }
 
@@ -93,56 +83,6 @@ class _ProfileEditState extends State<ProfileEdit> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
               children: [
-                Center(
-                  child: Column(
-                    children: [
-                      InkWell(
-                        onTap: _pickImage,
-                        customBorder: const CircleBorder(),
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(color: AppTheme.primary.withValues(alpha: .2), width: 2),
-                              ),
-                              child: CircleAvatar(
-                                radius: 46,
-                                backgroundColor: AppTheme.primaryContainer,
-                                backgroundImage: _imagePath == null ? null : FileImage(File(_imagePath!)),
-                                child: _imagePath == null ? const Icon(Icons.person_outline, color: AppTheme.primary, size: 42) : null,
-                              ),
-                            ),
-                            Positioned(
-                              right: 0,
-                              bottom: 2,
-                              child: Container(
-                                width: 32,
-                                height: 32,
-                                decoration: BoxDecoration(
-                                  color: AppTheme.primary,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: AppTheme.background, width: 3),
-                                ),
-                                child: const Icon(Icons.camera_alt_outlined, color: Colors.white, size: 15),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextButton.icon(
-                        onPressed: _pickImage,
-                        icon: const Icon(Icons.photo_library_outlined, size: 18),
-                        label: const Text('Change profile photo'),
-                        style: TextButton.styleFrom(foregroundColor: AppTheme.primary),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
                 Text('Personal details', style: Theme.of(context).textTheme.headlineSmall),
                 const SizedBox(height: 4),
                 Text('Keep your contact and delivery information up to date.', style: Theme.of(context).textTheme.bodyMedium),

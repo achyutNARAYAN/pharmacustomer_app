@@ -28,7 +28,6 @@ class PrescriptionReview extends StatefulWidget {
   final String patientName;
   final String? patientId;
   final List<String> allergies;
-  final String? profileImagePath;
 
   const PrescriptionReview({
     super.key,
@@ -36,7 +35,6 @@ class PrescriptionReview extends StatefulWidget {
     required this.patientName,
     this.patientId,
     this.allergies = const [],
-    this.profileImagePath,
   });
 
   @override

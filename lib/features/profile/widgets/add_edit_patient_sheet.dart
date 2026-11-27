@@ -89,21 +89,28 @@ class _AddEditPatientSheetState extends State<_AddEditPatientSheet> {
   }
 
   @override
-  Widget build(BuildContext context) => Container(
-    decoration: const BoxDecoration(
-      color: AppTheme.background,
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-    ),
-    child: SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-        child: SizedBox(
-          height:
-              (MediaQuery.sizeOf(context).height * .9 -
-                      MediaQuery.viewInsetsOf(context).bottom)
-                  .clamp(320.0, MediaQuery.sizeOf(context).height * .9),
-          child: Column(
+  Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final topSafePadding = MediaQuery.paddingOf(context).top;
+    final maxAvailable = (screenHeight - keyboardInset - topSafePadding - 24)
+        .clamp(240.0, screenHeight * 0.5);
+    final sheetHeight = (screenHeight * 0.5).clamp(240.0, maxAvailable);
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: keyboardInset),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: AppTheme.background,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+            child: SizedBox(
+              height: sheetHeight,
+              child: Column(
             children: [
               Row(
                 children: [
@@ -293,7 +300,9 @@ class _AddEditPatientSheetState extends State<_AddEditPatientSheet> {
         ),
       ),
     ),
-  );
+      ),
+    );
+  }
 
   Widget _field(
     TextEditingController c,

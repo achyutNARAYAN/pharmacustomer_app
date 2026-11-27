@@ -28,7 +28,8 @@ class _HealthCategoryItem {
 
 class Search extends StatefulWidget {
   final VoidCallback? onBack;
-  const Search({super.key, this.onBack});
+  final bool autoFocus;
+  const Search({super.key, this.onBack, this.autoFocus = false});
 
   @override
   State<Search> createState() => _SearchState();
@@ -120,6 +121,7 @@ class _SearchState extends State<Search> {
           ),
           child: TextField(
             controller: _searchController,
+            autofocus: widget.autoFocus,
             onChanged: _onSearchChanged,
             onSubmitted: (val) {
               _debounceTimer?.cancel();

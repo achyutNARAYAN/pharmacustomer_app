@@ -1,7 +1,4 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme.dart';
@@ -25,7 +22,6 @@ class _ProfileSetupState extends State<ProfileSetup> {
   final TextEditingController _dobController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   DateTime? _selectedDobDate;
-  XFile? _profileImage;
   String? _selectedGender;
   late String _phoneNumber;
   bool _isSaving = false;
@@ -60,11 +56,6 @@ class _ProfileSetupState extends State<ProfileSetup> {
             '${picked.day.toString().padLeft(2, '0')} / ${picked.month.toString().padLeft(2, '0')} / ${picked.year}';
       });
     }
-  }
-
-  Future<void> _selectProfileImage() async {
-    final image = await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (image != null && mounted) setState(() => _profileImage = image);
   }
 
   Future<void> _completeProfile() async {
@@ -129,7 +120,6 @@ class _ProfileSetupState extends State<ProfileSetup> {
             name: name,
             phoneNumber: _phoneNumber,
             email: _emailController.text.trim(),
-            profileImagePath: _profileImage?.path,
           ),
         ),
         (route) => false,
@@ -165,48 +155,7 @@ class _ProfileSetupState extends State<ProfileSetup> {
                 'Help us personalize your medicine delivery and order receipts',
                 style: TextStyle(color: Colors.grey, fontSize: 14),
               ),
-              const SizedBox(height: 32),
-              Center(
-                child: GestureDetector(
-                  onTap: _selectProfileImage,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Stack(
-                        alignment: Alignment.bottomRight,
-                        children: [
-                          Container(
-                            width: 100,
-                            height: 100,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.teal.withValues(alpha: 0.2), width: 4),
-                              image: _profileImage == null
-                                  ? null
-                                  : DecorationImage(
-                                      image: FileImage(File(_profileImage!.path)),
-                                      fit: BoxFit.cover,
-                                    ),
-                            ),
-                            child: _profileImage == null
-                                ? const Icon(Icons.person_outline, size: 48, color: AppTheme.primary)
-                                : null,
-                          ),
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: const BoxDecoration(color: AppTheme.primary, shape: BoxShape.circle),
-                            child: const Icon(Icons.camera_alt, color: Colors.white, size: 16),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      const Text('Add patient profile photo', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 28),
               _buildLabel('Full Name *', 'As per Gov ID'),
               TextField(
                 controller: _nameController,

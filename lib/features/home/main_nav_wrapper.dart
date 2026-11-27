@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme.dart';
 import '../../core/providers/cart_notifier.dart';
 import '../../core/providers/profile_notifier.dart';
+import '../prescriptions/providers/prescription_provider.dart';
 import '../prescriptions/repositories/prescription_repository.dart';
 import '../orders/providers/orders_provider.dart';
 import 'home.dart';
@@ -24,14 +23,12 @@ class MainNavWrapper extends StatefulWidget {
   final String phoneNumber;
   final String email;
   final String location;
-  final String? profileImagePath;
   const MainNavWrapper({
     super.key,
     required this.name,
     this.phoneNumber = '',
     this.email = '',
     this.location = 'Set delivery location',
-    this.profileImagePath,
   });
 
   @override
@@ -54,7 +51,6 @@ class _MainNavWrapperState extends State<MainNavWrapper> {
       address: initialLocation,
       workAddress: profile.workAddress,
       parentsAddress: profile.parentsAddress,
-      profileImagePath: widget.profileImagePath,
     );
   }
 
@@ -69,7 +65,6 @@ class _MainNavWrapperState extends State<MainNavWrapper> {
         address: profile.address,
         workAddress: profile.workAddress,
         parentsAddress: profile.parentsAddress,
-        profileImagePath: profile.profileImagePath,
       ))),
     );
     if (updated != null && mounted) {
@@ -80,7 +75,6 @@ class _MainNavWrapperState extends State<MainNavWrapper> {
         address: updated.address,
         workAddress: updated.workAddress,
         parentsAddress: updated.parentsAddress,
-        profileImagePath: updated.profileImagePath,
       );
     }
   }
@@ -117,7 +111,6 @@ class _MainNavWrapperState extends State<MainNavWrapper> {
               return Home(
                 name: profile.name,
                 location: loc,
-                profileImagePath: profile.profileImagePath,
                 onPrescriptionUpload: _reviewHomePrescription,
               );
             },
@@ -126,7 +119,6 @@ class _MainNavWrapperState extends State<MainNavWrapper> {
           OrderHistory(isActiveTab: _currentIndex == 2),
           PrescriptionVault(
             patientName: profile.name,
-            profileImagePath: profile.profileImagePath,
             onBack: () => setState(() => _currentIndex = 0),
           ),
           ProfileHome(
@@ -134,7 +126,6 @@ class _MainNavWrapperState extends State<MainNavWrapper> {
             phoneNumber: profile.phoneNumber,
             email: profile.email,
             address: profile.address,
-            profileImagePath: profile.profileImagePath,
             onEdit: _editProfile,
           ),
         ],
@@ -148,7 +139,13 @@ class _MainNavWrapperState extends State<MainNavWrapper> {
           backgroundColor: AppTheme.background,
           animationCurve: Curves.easeInOut,
           animationDuration: const Duration(milliseconds: 300),
-          onTap: (i) => setState(() => _currentIndex = i),
+          onTap: (i) {
+            setState(() => _currentIndex = i);
+            if (i == 4) {
+              context.read<OrdersProvider>().syncRemoteOrders(silent: true);
+              context.read<PrescriptionProvider>().refresh();
+            }
+          },
           items: [
             const Icon(Icons.home_rounded, size: 28, color: Colors.white),
             const Icon(Icons.search_rounded, size: 28, color: Colors.white),
@@ -158,12 +155,7 @@ class _MainNavWrapperState extends State<MainNavWrapper> {
               size: 28,
             ),
             const Icon(Icons.description_rounded, size: 28, color: Colors.white),
-            profile.profileImagePath == null
-                ? const Icon(Icons.person_rounded, size: 28, color: Colors.white)
-                : CircleAvatar(
-                    radius: 14,
-                    backgroundImage: FileImage(File(profile.profileImagePath!)),
-                  ),
+            const Icon(Icons.person_rounded, size: 28, color: Colors.white),
           ],
         ),
       ),

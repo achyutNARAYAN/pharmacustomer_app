@@ -46,7 +46,9 @@ class ApiServicePatientRepository implements PatientRepository {
             PatientProfile(
               id: id.isNotEmpty ? id : DateTime.now().microsecondsSinceEpoch.toString(),
               name: name,
-              relation: _parseRelation(m['relationship'] as String?),
+              relation: _parseRelation(
+                (m['relation'] ?? m['relationship']) as String?,
+              ),
               gender: _parseGender(m['gender'] as String?),
               lastUpdated: DateTime.now(),
             ),

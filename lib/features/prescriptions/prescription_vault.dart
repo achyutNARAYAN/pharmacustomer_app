@@ -18,7 +18,6 @@ class PrescriptionVault extends StatefulWidget {
   final String patientName;
   final String? patientId;
   final List<String> allergies;
-  final String? profileImagePath;
   final VoidCallback? onBack;
 
   const PrescriptionVault({
@@ -26,7 +25,6 @@ class PrescriptionVault extends StatefulWidget {
     required this.patientName,
     this.patientId,
     this.allergies = const [],
-    this.profileImagePath,
     this.onBack,
   });
 
@@ -298,7 +296,6 @@ class _PrescriptionVaultState extends State<PrescriptionVault> {
           patientName: widget.patientName,
           patientId: widget.patientId,
           allergies: widget.allergies,
-          profileImagePath: widget.profileImagePath,
         ),
       ),
     );

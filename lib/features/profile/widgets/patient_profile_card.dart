@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../../core/theme.dart';
 import '../models/patient_profile.dart';
@@ -8,14 +7,12 @@ class PatientProfileCard extends StatelessWidget {
   const PatientProfileCard({
     super.key,
     required this.profile,
-    this.photoPath,
     required this.onTap,
     required this.onEdit,
     required this.onDefault,
     required this.onDelete,
   });
   final PatientProfile profile;
-  final String? photoPath;
   final VoidCallback onTap, onEdit, onDefault, onDelete;
 
   @override
@@ -48,12 +45,7 @@ class PatientProfileCard extends StatelessWidget {
                 child: CircleAvatar(
                   radius: 24,
                   backgroundColor: AppTheme.primaryContainer,
-                  backgroundImage: photoPath == null
-                      ? null
-                      : FileImage(File(photoPath!)),
-                  child: photoPath == null
-                      ? Icon(icon, color: AppTheme.primary)
-                      : null,
+                  child: Icon(icon, color: AppTheme.primary),
                 ),
               ),
               const SizedBox(width: 12),
