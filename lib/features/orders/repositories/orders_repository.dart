@@ -99,9 +99,15 @@ class OrdersRepository {
     try {
       final res = await ApiService.getOrderDetails(orderId);
       if (res is Map<String, dynamic>) {
-        final data = res.containsKey('data') && res['data'] is Map<String, dynamic>
+        final rawData = res.containsKey('data') && res['data'] is Map<String, dynamic>
             ? res['data'] as Map<String, dynamic>
             : res;
+        final data = rawData['order'] is Map<String, dynamic>
+            ? <String, dynamic>{
+                ...rawData,
+                ...(rawData['order'] as Map<String, dynamic>),
+              }
+            : rawData;
         return OrderModel.fromJson(data);
       }
       return null;

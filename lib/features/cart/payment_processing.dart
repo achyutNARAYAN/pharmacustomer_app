@@ -25,6 +25,7 @@ class PaymentProcessing extends StatefulWidget {
 
 class _PaymentProcessingState extends State<PaymentProcessing> {
   bool _isProcessing = true;
+  bool _requestInFlight = false;
   String? _errorMessage;
 
   @override
@@ -36,6 +37,8 @@ class _PaymentProcessingState extends State<PaymentProcessing> {
   }
 
   Future<void> _processPayment() async {
+    if (_requestInFlight) return;
+    _requestInFlight = true;
     setState(() {
       _isProcessing = true;
       _errorMessage = null;
@@ -101,6 +104,7 @@ class _PaymentProcessingState extends State<PaymentProcessing> {
       );
     } catch (e) {
       if (!mounted) return;
+      _requestInFlight = false;
       setState(() {
         _isProcessing = false;
         _errorMessage = e is Failure ? e.message : e.toString().replaceFirst('Exception: ', '');
@@ -214,20 +218,6 @@ class _PaymentProcessingState extends State<PaymentProcessing> {
                 Text(
                   'Order total · ₹${widget.amount.toStringAsFixed(2)}',
                   style: const TextStyle(color: AppTheme.primaryDark, fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-          ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(20, 0, 20, 24),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.lock_outline, size: 16, color: AppTheme.mutedText),
-                SizedBox(width: 6),
-                Text(
-                  '128-bit Encrypted Banking Handshake',
-                  style: TextStyle(fontSize: 12, color: AppTheme.mutedText),
                 ),
               ],
             ),

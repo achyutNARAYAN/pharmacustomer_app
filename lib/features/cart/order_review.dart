@@ -12,16 +12,106 @@ import '../profile/providers/customer_address_provider.dart';
 import 'address.dart';
 import 'payment_processing.dart';
 
-class OrderReview extends StatelessWidget {
+class OrderReview extends StatefulWidget {
   const OrderReview({super.key, required this.amount, required this.method});
   final double amount;
   final String method;
+
+  @override
+  State<OrderReview> createState() => _OrderReviewState();
+}
+
+class _OrderReviewState extends State<OrderReview> {
+  bool _isSubmitting = false;
 
   String _formatPharmacyName(String? raw) {
     if (raw == null || raw.trim().isEmpty) return '';
     final words = raw.trim().split(RegExp(r'\s+'));
     if (words.length <= 2) return words.join(' ');
     return '${words[0]} ${words[1]}';
+  }
+
+  Future<void> _handlePay({
+    required CartNotifier cart,
+    required bool isServiceable,
+    required String? pinCode,
+    required String? activeAddressId,
+  }) async {
+    if (_isSubmitting) return;
+
+    if (!isServiceable) {
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.redAccent),
+              SizedBox(width: 8),
+              Text('Unserviceable Address'),
+            ],
+          ),
+          content: Text(
+            'Delivery is not available at PIN code ${pinCode ?? "selected"}. '
+            'Our dark store network does not service this location yet. '
+            'Please select or add a serviceable delivery address to place your order.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => const Address(popOnSelect: true),
+                  ),
+                );
+              },
+              child: const Text('Change Address'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      final addrId = activeAddressId != null && activeAddressId.isNotEmpty
+          ? activeAddressId
+          : 'addr_default';
+
+      if (ApiService.token != null) {
+        await cart.performCheckout(
+          addressId: addrId,
+          prescriptionId: cart.prescriptionId,
+          couponCode: cart.couponCode,
+        );
+      }
+      if (!mounted) return;
+      await Navigator.push(
+        context,
+        MaterialPageRoute<void>(
+          builder: (_) => PaymentProcessing(
+            amount: widget.amount,
+            method: widget.method,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final msg = e is Failure ? e.message : e.toString();
+      AppToast.error(context, msg);
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
   }
 
   @override
@@ -222,7 +312,7 @@ class OrderReview extends StatelessWidget {
           _row(
             'Total payable',
             cart.remoteCart?.formattedTotalPayable ??
-                '₹${amount.toStringAsFixed(0)}',
+                '₹${widget.amount.toStringAsFixed(0)}',
             bold: true,
           ),
         ])),
@@ -233,7 +323,7 @@ class OrderReview extends StatelessWidget {
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Text('Payment method', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 3),
-            Text(method, style: const TextStyle(color: AppTheme.mutedText)),
+            Text(widget.method, style: const TextStyle(color: AppTheme.mutedText)),
           ])),
         ])),
         const SizedBox(height: 18),
@@ -247,82 +337,46 @@ class OrderReview extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
           child: ElevatedButton.icon(
-            onPressed: () async {
-              if (!isServiceable) {
-                showDialog<void>(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                    title: const Row(
-                      children: [
-                        Icon(Icons.warning_amber_rounded, color: Colors.redAccent),
-                        SizedBox(width: 8),
-                        Text('Unserviceable Address'),
-                      ],
-                    ),
-                    content: Text(
-                      'Delivery is not available at PIN code ${pinCode ?? "selected"}. '
-                      'Our dark store network does not service this location yet. '
-                      'Please select or add a serviceable delivery address to place your order.',
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        child: const Text('Cancel'),
-                      ),
-                      FilledButton(
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute<void>(
-                              builder: (_) => const Address(popOnSelect: true),
-                            ),
-                          );
-                        },
-                        child: const Text('Change Address'),
-                      ),
-                    ],
-                  ),
-                );
-                return;
-              }
-
-              final addrId = activeAddress?.id.isNotEmpty == true
-                  ? activeAddress!.id
-                  : 'addr_default';
-
-              try {
-                if (ApiService.token != null) {
-                  await cart.performCheckout(
-                    addressId: addrId,
-                    prescriptionId: cart.prescriptionId,
-                    couponCode: cart.couponCode,
-                  );
-                }
-              } catch (e) {
-                if (!context.mounted) return;
-                final msg = e is Failure ? e.message : e.toString();
-                AppToast.error(context, msg);
-                return;
-              }
-              if (!context.mounted) return;
-              Navigator.push(
-                context,
-                MaterialPageRoute<void>(
-                  builder: (_) => PaymentProcessing(amount: amount, method: method),
-                ),
-              );
-            },
-            icon: Icon(isServiceable ? Icons.verified_user_outlined : Icons.lock_outline_rounded),
-            label: Text(
-              isServiceable
-                  ? 'Authorize & Pay  ·  ₹${amount.toStringAsFixed(0)}'
-                  : 'Address Unserviceable',
-            ),
-            style: isServiceable
+            onPressed: _isSubmitting
                 ? null
-                : ElevatedButton.styleFrom(backgroundColor: Colors.grey.shade600),
+                : () => _handlePay(
+                      cart: cart,
+                      isServiceable: isServiceable,
+                      pinCode: pinCode,
+                      activeAddressId: activeAddress?.id,
+                    ),
+            icon: _isSubmitting
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : Icon(
+                    isServiceable
+                        ? Icons.verified_user_outlined
+                        : Icons.lock_outline_rounded,
+                  ),
+            label: Text(
+              _isSubmitting
+                  ? 'Confirming Payment…'
+                  : isServiceable
+                      ? 'Pay  ₹${widget.amount.toStringAsFixed(0)}'
+                      : 'Address Unserviceable',
+            ),
+            style: _isSubmitting
+                ? ElevatedButton.styleFrom(
+                    disabledBackgroundColor:
+                        AppTheme.primary.withValues(alpha: 0.7),
+                    disabledForegroundColor: Colors.white,
+                  )
+                : isServiceable
+                    ? null
+                    : ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey.shade600,
+                      ),
           ),
         ),
       ),

@@ -19,11 +19,15 @@ enum OrderStatus {
 
   static OrderStatus fromString(String? status) {
     if (status == null || status.isEmpty) return OrderStatus.ORDER_PLACED;
-    final normalized = status.toUpperCase().trim();
+    final normalized = status
+        .toUpperCase()
+        .trim()
+        .replaceAll('-', '_')
+        .replaceAll(RegExp(r'\s+'), '_');
     return OrderStatus.values.firstWhere(
       (e) => e.name == normalized,
       orElse: () {
-        // Fallback mapping for legacy names if any
+        // Fallback mapping for legacy/alternate backend status names
         switch (normalized) {
           case 'PLACED':
           case 'ORDER_PLACED':
@@ -34,10 +38,18 @@ enum OrderStatus {
           case 'STOREACCEPTED':
           case 'ACCEPTED_BY_STORE':
           case 'STORE_CONFIRMED':
+          case 'PHARMACY_ACCEPTED':
+          case 'ACCEPTED_BY_PHARMACY':
+          case 'PHARMACY_CONFIRMED':
+          case 'VERIFIED':
+          case 'APPROVED':
             return OrderStatus.STORE_ACCEPTED;
           case 'PROCESSING':
           case 'PACKING':
           case 'PACKED':
+          case 'PREPARING':
+          case 'DISPENSING':
+          case 'PACKING_STARTED':
             return OrderStatus.PACKING;
           case 'READY_FOR_PICKUP':
           case 'READY':
@@ -437,7 +449,14 @@ class OrderModel {
     );
   }
 
-  factory OrderModel.fromJson(Map<String, dynamic> json) {
+  factory OrderModel.fromJson(Map<String, dynamic> rawJson) {
+    final json = rawJson['order'] is Map<String, dynamic>
+        ? <String, dynamic>{
+            ...rawJson,
+            ...(rawJson['order'] as Map<String, dynamic>),
+          }
+        : rawJson;
+
     final id = json['_id']?.toString() ?? json['id']?.toString() ?? '';
     final orderCode = json['orderCode']?.toString() ?? json['orderId']?.toString() ?? id;
     final status = OrderStatus.fromString(json['status']?.toString());
@@ -535,9 +554,25 @@ class OrderModel {
     final storeAcceptanceDeadlineAt = json['storeAcceptanceDeadlineAt'] != null
         ? DateTime.tryParse(json['storeAcceptanceDeadlineAt'].toString())
         : null;
-    final storeAcceptedAt = json['storeAcceptedAt'] != null
-        ? DateTime.tryParse(json['storeAcceptedAt'].toString())
+    final rawAcceptedAt = json['storeAcceptedAt'] ??
+        json['acceptedAt'] ??
+        json['pharmacyAcceptedAt'];
+    DateTime? storeAcceptedAt = rawAcceptedAt != null
+        ? DateTime.tryParse(rawAcceptedAt.toString())
         : null;
+    if (storeAcceptedAt == null) {
+      for (final h in history) {
+        if (h.status == OrderStatus.STORE_ACCEPTED ||
+            h.status == OrderStatus.PACKING ||
+            h.status == OrderStatus.READY_FOR_PICKUP ||
+            h.status == OrderStatus.DRIVER_ASSIGNED ||
+            h.status == OrderStatus.OUT_FOR_DELIVERY ||
+            h.status == OrderStatus.DELIVERED) {
+          storeAcceptedAt = h.changedAt ?? createdAt;
+          break;
+        }
+      }
+    }
     final packedAt = json['packedAt'] != null
         ? DateTime.tryParse(json['packedAt'].toString())
         : null;

@@ -133,8 +133,21 @@ class _HomeState extends State<Home> {
             child: const Icon(Icons.local_pharmacy_outlined, color: Colors.white, size: 20),
           ),
           const SizedBox(width: 10),
-          Text('PharmaCustomer',
-              style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold, fontSize: 17)),
+          const Expanded(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'PharmaCustomer',
+                maxLines: 1,
+                style: TextStyle(
+                  color: AppTheme.primary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 17,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
       actions: [

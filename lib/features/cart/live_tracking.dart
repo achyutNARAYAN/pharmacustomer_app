@@ -34,6 +34,8 @@ class _LiveTrackingState extends State<LiveTracking> {
   Duration _remainingSla = Duration.zero;
   List<LatLng>? _cachedRoutePoints;
   LatLng? _cachedDestination;
+  CustomerAddress? _cachedAddress;
+  LatLng? _cachedResolvedCoords;
 
   @override
   void initState() {
@@ -79,7 +81,7 @@ class _LiveTrackingState extends State<LiveTracking> {
 
     final isAwaitingChemist = order != null &&
         order.status == OrderStatus.ORDER_PLACED &&
-        order.storeAcceptedAt == null &&
+        !order.isStoreAccepted &&
         order.storeAcceptanceDeadlineAt != null;
 
     if (isAwaitingChemist) {
@@ -140,8 +142,9 @@ class _LiveTrackingState extends State<LiveTracking> {
       ordersProvider = Provider.of<OrdersProvider>(context, listen: false);
     } catch (_) {}
 
-    // ── 1. Resolve Customer Delivery Address dynamically from API & Selected Address ──
-    CustomerAddress? activeAddress = addressProvider?.selectedAddress;
+    // ── 1. Resolve Customer Delivery Address (cached on silent polls) ────────
+    CustomerAddress? activeAddress =
+        silent && _cachedAddress != null ? _cachedAddress : addressProvider?.selectedAddress;
 
     // Check if customer explicitly chose an address during cart/checkout
     if (activeAddress == null && cart.remoteCart?.deliveryAddress != null) {
@@ -162,35 +165,36 @@ class _LiveTrackingState extends State<LiveTracking> {
       );
     }
 
-    // Always fetch live addresses from Address API (/customers/{id}/addresses)
-    // to find the user's default address or newly added address
-    try {
-      final apiAddresses = await ApiService.getAddresses();
-      if (apiAddresses.isNotEmpty) {
-        // If customer previously selected an address, see if it matches in the API list
-        Map<String, dynamic>? targetApiAddr;
-        if (activeAddress != null && activeAddress.id.isNotEmpty) {
-          final selectedId = activeAddress.id;
-          targetApiAddr = apiAddresses.firstWhere(
-            (a) => a['_id'] == selectedId || a['id'] == selectedId,
-            orElse: () => apiAddresses.firstWhere(
+    if (!silent || _cachedAddress == null) {
+      // Always fetch live addresses from Address API (/customers/{id}/addresses)
+      // on initial load (or if not yet cached)
+      try {
+        final apiAddresses = await ApiService.getAddresses();
+        if (apiAddresses.isNotEmpty) {
+          Map<String, dynamic>? targetApiAddr;
+          if (activeAddress != null && activeAddress.id.isNotEmpty) {
+            final selectedId = activeAddress.id;
+            targetApiAddr = apiAddresses.firstWhere(
+              (a) => a['_id'] == selectedId || a['id'] == selectedId,
+              orElse: () => apiAddresses.firstWhere(
+                (a) => a['isDefault'] == true,
+                orElse: () => apiAddresses.first,
+              ),
+            );
+          } else {
+            targetApiAddr = apiAddresses.firstWhere(
               (a) => a['isDefault'] == true,
               orElse: () => apiAddresses.first,
-            ),
-          );
-        } else {
-          // Use default address from API (isDefault == true)
-          targetApiAddr = apiAddresses.firstWhere(
-            (a) => a['isDefault'] == true,
-            orElse: () => apiAddresses.first,
-          );
+            );
+          }
+          activeAddress = CustomerAddress.fromJson(targetApiAddr);
         }
-        activeAddress = CustomerAddress.fromJson(targetApiAddr);
-      }
-    } catch (_) {}
-
-    // Fallback to addressProvider default only if still null
-    activeAddress ??= addressProvider?.defaultAddress;
+      } catch (_) {}
+      activeAddress ??= addressProvider?.defaultAddress;
+      _cachedAddress = activeAddress;
+    } else {
+      activeAddress ??= addressProvider?.defaultAddress;
+    }
 
     // If profile has a custom user-entered address
     String? fallbackAddressText;
@@ -201,33 +205,77 @@ class _LiveTrackingState extends State<LiveTracking> {
       fallbackAddressText = activeAddress.displayDetails;
     }
 
-    final activeOrderId = widget.orderId ?? ordersProvider?.orders.firstOrNull?.orderId;
+    final matchedCachedOrder = widget.orderId != null
+        ? ordersProvider?.orders
+            .where((o) =>
+                o.orderId == widget.orderId ||
+                o.id == widget.orderId ||
+                o.orderCode == widget.orderId)
+            .firstOrNull
+        : ordersProvider?.orders.firstOrNull;
+    final activeOrderId = (matchedCachedOrder != null && matchedCachedOrder.id.isNotEmpty)
+        ? matchedCachedOrder.id
+        : (widget.orderId ?? ordersProvider?.orders.firstOrNull?.orderId);
     final fallbackItems = cart.items.map((i) => i.name).toList();
 
     Map<String, dynamic>? backendData;
     OrderModel? fetchedOrder;
     if (activeOrderId != null && ApiService.token != null) {
-      try {
-        final res = await ApiService.getOrderDetails(activeOrderId);
-        if (res is Map<String, dynamic>) {
-          backendData = res.containsKey('data') && res['data'] is Map<String, dynamic>
-              ? res['data'] as Map<String, dynamic>
-              : res;
-          fetchedOrder = OrderModel.fromJson(backendData);
-        }
-      } catch (_) {}
+      final candidateIds = <String>[
+        activeOrderId,
+        if (widget.orderId != null && widget.orderId != activeOrderId) widget.orderId!,
+      ];
+      for (final cid in candidateIds) {
+        try {
+          final res = await ApiService.getOrderDetails(cid);
+          if (res is Map<String, dynamic>) {
+            final unwrapped = res.containsKey('data') && res['data'] is Map<String, dynamic>
+                ? res['data'] as Map<String, dynamic>
+                : res;
+            backendData = unwrapped['order'] is Map<String, dynamic>
+                ? <String, dynamic>{
+                    ...unwrapped,
+                    ...(unwrapped['order'] as Map<String, dynamic>),
+                  }
+                : unwrapped;
+            fetchedOrder = OrderModel.fromJson(backendData);
+            break;
+          }
+        } catch (_) {}
+      }
+
+      // Fallback to list endpoint if detail endpoint fails or returns null
+      if (fetchedOrder == null && ordersProvider != null) {
+        try {
+          await ordersProvider.syncRemoteOrders(silent: true);
+          fetchedOrder = ordersProvider.orders
+              .where((o) =>
+                  o.id == activeOrderId ||
+                  o.orderId == activeOrderId ||
+                  o.orderCode == activeOrderId ||
+                  (widget.orderId != null &&
+                      (o.id == widget.orderId ||
+                          o.orderId == widget.orderId ||
+                          o.orderCode == widget.orderId)))
+              .firstOrNull;
+        } catch (_) {}
+      }
     }
 
     if (!mounted) return;
 
-    // Resolve true real-world coordinates for the delivery address
-    final resolvedCoords = await AddressCoordinateResolver.resolve(
-      addressText: fallbackAddressText ?? activeAddress?.displayDetails ?? '',
-      pinCode: activeAddress?.pinCode,
-      city: activeAddress?.city,
-      latitude: activeAddress?.latitude,
-      longitude: activeAddress?.longitude,
-    );
+    // Resolve true real-world coordinates for the delivery address (cached across silent polls)
+    final resolvedCoords = (!silent || _cachedResolvedCoords == null)
+        ? (_cachedResolvedCoords = await AddressCoordinateResolver.resolve(
+            addressText: fallbackAddressText ?? activeAddress?.displayDetails ?? '',
+            pinCode: activeAddress?.pinCode,
+            city: activeAddress?.city,
+            latitude: activeAddress?.latitude,
+            longitude: activeAddress?.longitude,
+          ))
+        : _cachedResolvedCoords!;
+
+    backendData ??= fetchedOrder?.toJson();
 
     var resolvedTracking = DeliveryTrackingModel.fromBackend(
       json: backendData,
@@ -501,7 +549,7 @@ class _LiveTrackingState extends State<LiveTracking> {
             snap: true,
             builder: (context, scrollController) {
               final isAwaitingChemist = (_orderModel?.status == OrderStatus.ORDER_PLACED) &&
-                  (_orderModel?.storeAcceptedAt == null) &&
+                  (_orderModel?.isStoreAccepted != true) &&
                   (_remainingSla > Duration.zero);
 
               final isAcceptedOrPacking = (_orderModel?.isStoreAccepted == true ||

@@ -49,92 +49,98 @@ class CustomerAddressCard extends StatelessWidget {
             children: [
               // Header Row: Type Badge + Default Badge + Serviceable Tag + Actions
               Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Address Type Badge (HOME, WORK, OTHER)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                  Expanded(
+                    child: Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Icon(
-                          address.addressType.icon,
-                          size: 15,
-                          color: AppTheme.primary,
-                        ),
-                        const SizedBox(width: 5),
-                        Text(
-                          address.typeKey,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.5,
-                            color: AppTheme.primary,
+                        // Address Type Badge (HOME, WORK, OTHER)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                address.addressType.icon,
+                                size: 15,
+                                color: AppTheme.primary,
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                address.typeKey,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.5,
+                                  color: AppTheme.primary,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
 
-                  // Default Badge
-                  if (address.isDefault)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFF3E0),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFFFFB74D), width: 0.8),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.star_rounded, size: 12, color: Color(0xFFE65100)),
-                          SizedBox(width: 3),
-                          Text(
-                            'DEFAULT',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFFE65100),
+                        // Default Badge
+                        if (address.isDefault)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF3E0),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFFFFB74D), width: 0.8),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.star_rounded, size: 12, color: Color(0xFFE65100)),
+                                SizedBox(width: 3),
+                                Text(
+                                  'DEFAULT',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFFE65100),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
-                    ),
 
-                  const Spacer(),
-
-                  // Serviceability Pill
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: isServiceable ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: isServiceable ? const Color(0xFFA5D6A7) : const Color(0xFFEF9A9A),
-                        width: 0.8,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          isServiceable ? Icons.check_circle_outline : Icons.cancel_outlined,
-                          size: 13,
-                          color: isServiceable ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          isServiceable ? 'Serviceable' : 'Unserviceable',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: isServiceable ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
+                        // Serviceability Pill
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: isServiceable ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isServiceable ? const Color(0xFFA5D6A7) : const Color(0xFFEF9A9A),
+                              width: 0.8,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                isServiceable ? Icons.check_circle_outline : Icons.cancel_outlined,
+                                size: 13,
+                                color: isServiceable ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                isServiceable ? 'Serviceable' : 'Unserviceable',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: isServiceable ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],

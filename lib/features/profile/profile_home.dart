@@ -789,19 +789,6 @@ class _HeroCard extends StatelessWidget {
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 6),
-                              Container(
-                                width: 18, height: 18,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFF4ADE80),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.check,
-                                  size: 11,
-                                  color: Colors.white,
-                                ),
-                              ),
                             ],
                           ),
                           const SizedBox(height: 4),

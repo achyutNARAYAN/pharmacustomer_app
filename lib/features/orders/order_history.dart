@@ -349,9 +349,11 @@ class _OrderHistoryState extends State<OrderHistory> with WidgetsBindingObserver
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppTheme.surfaceLow,
+                color: const Color(0xFFE0F2F1),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.outlineBorder),
+                border: Border.all(
+                  color: AppTheme.subsidyTeal.withValues(alpha: 0.35),
+                ),
               ),
               child: OrderTimelineStepper(
                 status: order.status,
@@ -391,10 +393,10 @@ class _OrderHistoryState extends State<OrderHistory> with WidgetsBindingObserver
                             Container(
                               padding: const EdgeInsets.all(6),
                               decoration: BoxDecoration(
-                                color: AppTheme.surfaceLow,
+                                color: const Color(0xFFE0F2F1),
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: const Icon(Icons.medication_outlined, size: 16, color: AppTheme.primary),
+                              child: const Icon(Icons.medication_outlined, size: 16, color: AppTheme.subsidyTeal),
                             ),
                             const SizedBox(width: 10),
                             Expanded(

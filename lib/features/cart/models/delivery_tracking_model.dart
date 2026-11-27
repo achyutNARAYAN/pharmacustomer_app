@@ -104,7 +104,13 @@ class DeliveryTrackingModel {
     int? fallbackItemCount,
     List<String>? fallbackItemNames,
   }) {
-    final data = json ?? {};
+    final raw = json ?? <String, dynamic>{};
+    final data = raw['order'] is Map<String, dynamic>
+        ? <String, dynamic>{
+            ...raw,
+            ...(raw['order'] as Map<String, dynamic>),
+          }
+        : raw;
 
     // 1. Order ID resolution
     final rawId = data['orderId'] as String? ??
@@ -130,7 +136,15 @@ class DeliveryTrackingModel {
       'DRIVER_ASSIGNED' => 'Rider assigned · Heading to pharmacy',
       'READY_FOR_PICKUP' => 'Order packed · Waiting for pickup',
       'PACKING' || 'PROCESSING' => 'Pharmacy is packing your order',
-      'STORE_ACCEPTED' || 'CONFIRMED' || 'ACCEPTED' => 'Pharmacy accepted · Verifying items',
+      'STORE_ACCEPTED' ||
+      'CONFIRMED' ||
+      'ACCEPTED' ||
+      'PHARMACY_ACCEPTED' ||
+      'ACCEPTED_BY_PHARMACY' ||
+      'STORE_CONFIRMED' ||
+      'ACCEPTED_BY_STORE' ||
+      'VERIFIED' =>
+        'Pharmacy accepted · Verifying items',
       'ORDER_PLACED' => 'Order placed · Chemist verifying stock',
       'PAYMENT_PENDING' => 'Awaiting payment confirmation',
       'CANCELLED' => 'Order Cancelled',

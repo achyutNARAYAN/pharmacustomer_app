@@ -164,7 +164,7 @@ class OrderTimelineStepper extends StatelessWidget {
         // Stepper Title
         Row(
           children: [
-            const Icon(Icons.timeline_rounded, color: AppTheme.primary, size: 20),
+            const Icon(Icons.timeline_rounded, color: AppTheme.subsidyTeal, size: 20),
             const SizedBox(width: 8),
             const Text(
               'Live Order Timeline',
@@ -178,8 +178,15 @@ class OrderTimelineStepper extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: isTerminal ? Colors.red.shade50 : AppTheme.surfaceLow,
+                color: isTerminal
+                    ? Colors.red.shade50
+                    : AppTheme.subsidyTeal.withValues(alpha: 0.14),
                 borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isTerminal
+                      ? Colors.red.shade200
+                      : AppTheme.subsidyTeal.withValues(alpha: 0.35),
+                ),
               ),
               child: Text(
                 status.displayTitle,
@@ -220,16 +227,16 @@ class OrderTimelineStepper extends StatelessWidget {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: isDone
-                          ? AppTheme.primary
+                          ? AppTheme.subsidyTeal
                           : (isCurrent
-                              ? const Color(0xFFE0F2F1)
-                              : Colors.grey.shade100),
+                              ? const Color(0xFFCCFBF1)
+                              : const Color(0xFFF0FDFA)),
                       border: Border.all(
                         color: isDone
-                            ? AppTheme.primary
+                            ? AppTheme.subsidyTeal
                             : (isCurrent
-                                ? AppTheme.primary
-                                : Colors.grey.shade300),
+                                ? AppTheme.subsidyTeal
+                                : const Color(0xFF99F6E4)),
                         width: isCurrent ? 2.5 : 1.5,
                       ),
                     ),
@@ -242,7 +249,7 @@ class OrderTimelineStepper extends StatelessWidget {
                                   height: 10,
                                   decoration: const BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: AppTheme.primary,
+                                    color: AppTheme.subsidyTeal,
                                   ),
                                 )
                               : Text(
@@ -250,7 +257,7 @@ class OrderTimelineStepper extends StatelessWidget {
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.grey.shade400,
+                                    color: AppTheme.subsidyTeal.withValues(alpha: 0.65),
                                   ),
                                 ),
                     ),
@@ -259,7 +266,9 @@ class OrderTimelineStepper extends StatelessWidget {
                     Container(
                       width: 2,
                       height: 38,
-                      color: isDone ? AppTheme.primary : Colors.grey.shade200,
+                      color: isDone
+                          ? AppTheme.subsidyTeal
+                          : AppTheme.subsidyTeal.withValues(alpha: 0.22),
                     ),
                 ],
               ),
