@@ -92,7 +92,7 @@ class _OrderHistoryState extends State<OrderHistory> with WidgetsBindingObserver
         }
         final prov = context.read<OrdersProvider>();
         if (prov.orders.any((o) => o.isActive)) {
-          prov.fetchOrders(silent: true);
+          prov.fetchOrders(silent: true, force: true);
         } else {
           _realtimePollTimer?.cancel();
           _realtimePollTimer = null;

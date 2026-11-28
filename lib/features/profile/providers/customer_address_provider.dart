@@ -7,12 +7,16 @@ import '../repositories/address_repository.dart';
 class CustomerAddressProvider extends ChangeNotifier {
   final AddressRepository repository;
 
+  String? _userId;
   List<CustomerAddress> _addresses = const [];
   CustomerAddress? _selectedAddress;
   bool _loading = false;
   bool _saving = false;
   String? _error;
   bool _disposed = false;
+  Future<void>? _inFlightRefresh;
+  DateTime? _lastFetchedAt;
+  static const Duration _staleDuration = Duration(minutes: 5);
 
   CustomerAddressProvider(this.repository) {
     final initial = repository.cachedAddresses;
@@ -60,10 +64,51 @@ class CustomerAddressProvider extends ChangeNotifier {
   }
 
   void bindUser(String? userId) {
-    refresh();
+    if (_userId == userId) return;
+    _userId = userId;
+    _lastFetchedAt = null;
+    if (userId == null || userId.isEmpty) {
+      _addresses = const [];
+      _selectedAddress = null;
+      _error = null;
+      _loading = false;
+      _safeNotify();
+      return;
+    }
+    // Hydrate from in-memory repository cache only; defer network sync until needed.
+    final cached = repository.cachedAddresses;
+    if (cached.isNotEmpty) {
+      _addresses = cached;
+      _selectedAddress ??= _resolveDefault(cached);
+      _safeNotify();
+    }
   }
 
-  Future<void> refresh() async {
+  /// Ensures addresses are loaded from the server if missing or stale.
+  Future<void> ensureLoaded() => refresh(force: false);
+
+  Future<void> refresh({bool force = true}) {
+    if (!force &&
+        _lastFetchedAt != null &&
+        DateTime.now().difference(_lastFetchedAt!) < _staleDuration &&
+        _addresses.isNotEmpty) {
+      return Future.value();
+    }
+    if (_inFlightRefresh != null) {
+      return _inFlightRefresh!;
+    }
+
+    final future = _doRefresh();
+    _inFlightRefresh = future;
+    future.whenComplete(() {
+      if (identical(_inFlightRefresh, future)) {
+        _inFlightRefresh = null;
+      }
+    });
+    return future;
+  }
+
+  Future<void> _doRefresh() async {
     if (_addresses.isEmpty) {
       _loading = true;
       _safeNotify();
@@ -72,6 +117,7 @@ class CustomerAddressProvider extends ChangeNotifier {
     try {
       final fresh = await repository.getAddresses();
       _addresses = fresh;
+      _lastFetchedAt = DateTime.now();
       if (_selectedAddress == null || !_addresses.any((a) => a.id == _selectedAddress!.id)) {
         _selectedAddress = _resolveDefault(_addresses);
       } else {

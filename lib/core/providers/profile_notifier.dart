@@ -18,6 +18,7 @@ class ProfileNotifier extends ChangeNotifier {
 
   LoadStatus _status = LoadStatus.uninitialized;
   bool _disposed = false;
+  Future<void>? _inFlightSync;
 
   ProfileNotifier([this._repository, UserProfile? initial]) {
     if (initial != null) {
@@ -142,7 +143,7 @@ class ProfileNotifier extends ChangeNotifier {
     _safeNotify();
   }
 
-  Future<void> init() async {
+  Future<void> init({bool forceRemote = false}) async {
     if (_repository == null || _userId.isEmpty) {
       _status = LoadStatus.ready;
       _safeNotify();
@@ -156,30 +157,58 @@ class ProfileNotifier extends ChangeNotifier {
       _applyProfile(profile);
     }
 
-    try {
-      if (ApiService.token != null) {
-        final remote = await ApiService.getCustomerProfile(_userId);
-        if (remote != null) {
-          final remoteName = remote['fullName'] as String?;
-          final remoteEmail = remote['email'] as String?;
-          final remotePhone = remote['mobileNumber'] as String?;
-          if (remoteName != null && remoteName.isNotEmpty) name = remoteName;
-          if (remoteEmail != null && remoteEmail.isNotEmpty) email = remoteEmail;
-          if (remotePhone != null && remotePhone.isNotEmpty) phoneNumber = remotePhone;
-          if (remote['addresses'] is List && (remote['addresses'] as List).isNotEmpty) {
-            final first = (remote['addresses'] as List).first as Map<String, dynamic>?;
-            if (first != null && (address.isEmpty || address == 'Set delivery location')) {
-              final line1 = first['addressLine1'] ?? '';
-              final city = first['city'] ?? '';
-              address = [line1, city].where((s) => s.toString().isNotEmpty).join(', ');
-            }
-          }
-          _schedulePersist();
-        }
-      }
-    } catch (_) {}
+    // If OTP verification already populated ApiService.cachedCustomerProfile,
+    // apply it directly and avoid a redundant /profile round-trip on login.
+    final cachedRemote = ApiService.cachedCustomerProfile;
+    if (!forceRemote && cachedRemote != null) {
+      _applyRemoteMap(cachedRemote);
+      _status = LoadStatus.ready;
+      _safeNotify();
+      return;
+    }
+
+    await _syncRemoteProfile();
     _status = LoadStatus.ready;
     _safeNotify();
+  }
+
+  void _applyRemoteMap(Map<String, dynamic> remote) {
+    final remoteName = remote['fullName'] as String?;
+    final remoteEmail = remote['email'] as String?;
+    final remotePhone = remote['mobileNumber'] as String?;
+    if (remoteName != null && remoteName.isNotEmpty) name = remoteName;
+    if (remoteEmail != null && remoteEmail.isNotEmpty) email = remoteEmail;
+    if (remotePhone != null && remotePhone.isNotEmpty) phoneNumber = remotePhone;
+    if (remote['addresses'] is List && (remote['addresses'] as List).isNotEmpty) {
+      final first = (remote['addresses'] as List).first as Map<String, dynamic>?;
+      if (first != null && (address.isEmpty || address == 'Set delivery location')) {
+        final line1 = first['addressLine1'] ?? '';
+        final city = first['city'] ?? '';
+        address = [line1, city].where((s) => s.toString().isNotEmpty).join(', ');
+      }
+    }
+    _schedulePersist();
+  }
+
+  Future<void> _syncRemoteProfile() {
+    if (ApiService.token == null || _userId.isEmpty) return Future.value();
+    if (_inFlightSync != null) return _inFlightSync!;
+
+    final future = () async {
+      try {
+        final remote = await ApiService.getCustomerProfile(_userId);
+        if (remote != null) {
+          _applyRemoteMap(remote);
+        }
+      } catch (_) {}
+    }();
+    _inFlightSync = future;
+    future.whenComplete(() {
+      if (identical(_inFlightSync, future)) {
+        _inFlightSync = null;
+      }
+    });
+    return future;
   }
 
   void bindUser(String? userId) {
@@ -194,7 +223,7 @@ class ProfileNotifier extends ChangeNotifier {
   }
 
   Future<void> refresh() async {
-    await init();
+    await init(forceRemote: true);
   }
 
   void reset() {

@@ -147,11 +147,11 @@ class _ProfileHomeState extends State<ProfileHome> {
     } catch (_) {}
 
     await Future.wait([
-      if (ordersProvider != null) ordersProvider.syncRemoteOrders(silent: true),
-      if (rxProvider != null) rxProvider.refresh(),
+      if (ordersProvider != null) ordersProvider.fetchOrders(silent: true, force: !silent),
+      if (rxProvider != null) rxProvider.refresh(force: !silent),
       if (patientProvider != null)
         patientProvider.refresh()
-      else
+      else if (!silent)
         ApiService.getCustomerProfile(),
     ]);
     if (!mounted) return;

@@ -140,7 +140,7 @@ class CartNotifier extends ChangeNotifier {
   }
 
   LoadStatus get status => _status;
-  bool get isHydrating => _status == LoadStatus.hydrating || _isSyncingRemote;
+  bool get isHydrating => _status == LoadStatus.hydrating || _inFlightRemoteSync != null;
   bool get userExplicitlyDetachedRx => _userExplicitlyDetachedRx;
 
   String? get prescriptionId {
@@ -735,14 +735,38 @@ class CartNotifier extends ChangeNotifier {
 
   // ── 11 Cart & Checkout REST API Integrations ──────────────────────────────
 
-  bool _isSyncingRemote = false;
+  Future<void>? _inFlightRemoteSync;
+  DateTime? _lastSyncedAt;
+  static const Duration _remoteSyncStaleDuration = Duration(seconds: 30);
 
   /// 1. Sync active customer cart with live catalogue pricing and summary flags
-  Future<void> syncRemoteCart() async {
-    if (_isSyncingRemote || _repository == null || ApiService.token == null) return;
-    _isSyncingRemote = true;
+  Future<void> syncRemoteCart({bool force = false}) {
+    if (_repository == null || ApiService.token == null) return Future.value();
+    if (!force &&
+        _remoteCart != null &&
+        _lastSyncedAt != null &&
+        DateTime.now().difference(_lastSyncedAt!) < _remoteSyncStaleDuration) {
+      return Future.value();
+    }
+    if (_inFlightRemoteSync != null) {
+      return _inFlightRemoteSync!;
+    }
+
+    final future = _doSyncRemoteCart();
+    _inFlightRemoteSync = future;
+    future.whenComplete(() {
+      if (identical(_inFlightRemoteSync, future)) {
+        _inFlightRemoteSync = null;
+      }
+    });
+    return future;
+  }
+
+  Future<void> _doSyncRemoteCart() async {
+    if (_repository == null || ApiService.token == null) return;
     try {
       final envelope = await _repository.fetchRemoteCartEnvelope();
+      _lastSyncedAt = DateTime.now();
       if (envelope != null) {
         _applyRemoteCart(
           envelope.cart,
@@ -753,8 +777,6 @@ class CartNotifier extends ChangeNotifier {
     } catch (e) {
       _actionError = e.toString();
       _safeNotify();
-    } finally {
-      _isSyncingRemote = false;
     }
   }
 
@@ -1148,8 +1170,8 @@ class CartNotifier extends ChangeNotifier {
     });
   }
 
-  Future<void> refresh() async {
-    await syncRemoteCart();
+  Future<void> refresh({bool force = true}) async {
+    await syncRemoteCart(force: force);
   }
 
   void reset() {

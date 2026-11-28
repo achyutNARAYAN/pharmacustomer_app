@@ -37,6 +37,7 @@ class MainNavWrapper extends StatefulWidget {
 
 class _MainNavWrapperState extends State<MainNavWrapper> {
   int _currentIndex = 0;
+  final Set<int> _visitedTabs = {0};
   @override
   void initState() {
     super.initState();
@@ -96,39 +97,59 @@ class _MainNavWrapperState extends State<MainNavWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    final profile = context.watch<ProfileNotifier>();
-    // IndexedStack preserves scroll + state across tab switches
+    // IndexedStack preserves scroll + state across visited tabs without eagerly
+    // mounting unvisited tabs on login.
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: [
-          Consumer<CustomerAddressProvider>(
-            builder: (_, addresses, _) {
-              final loc = addresses.defaultAddress?.displayDetails ??
-                  (profile.address.isNotEmpty && profile.address != 'Set delivery location'
-                      ? profile.address
-                      : 'Set delivery location');
-              return Home(
+      body: Selector<ProfileNotifier, ({String name, String phoneNumber, String email, String address})>(
+        selector: (_, p) => (
+          name: p.name,
+          phoneNumber: p.phoneNumber,
+          email: p.email,
+          address: p.address,
+        ),
+        builder: (context, profile, _) => IndexedStack(
+          index: _currentIndex,
+          children: [
+            Consumer<CustomerAddressProvider>(
+              builder: (_, addresses, _) {
+                final loc = addresses.defaultAddress?.displayDetails ??
+                    (profile.address.isNotEmpty && profile.address != 'Set delivery location'
+                        ? profile.address
+                        : 'Set delivery location');
+                return Home(
+                  name: profile.name,
+                  location: loc,
+                  onPrescriptionUpload: _reviewHomePrescription,
+                );
+              },
+            ),
+            if (_visitedTabs.contains(1))
+              Search(onBack: () => setState(() => _currentIndex = 0))
+            else
+              const SizedBox.shrink(),
+            if (_visitedTabs.contains(2))
+              OrderHistory(isActiveTab: _currentIndex == 2)
+            else
+              const SizedBox.shrink(),
+            if (_visitedTabs.contains(3))
+              PrescriptionVault(
+                patientName: profile.name,
+                onBack: () => setState(() => _currentIndex = 0),
+              )
+            else
+              const SizedBox.shrink(),
+            if (_visitedTabs.contains(4))
+              ProfileHome(
                 name: profile.name,
-                location: loc,
-                onPrescriptionUpload: _reviewHomePrescription,
-              );
-            },
-          ),
-          Search(onBack: () => setState(() => _currentIndex = 0)),
-          OrderHistory(isActiveTab: _currentIndex == 2),
-          PrescriptionVault(
-            patientName: profile.name,
-            onBack: () => setState(() => _currentIndex = 0),
-          ),
-          ProfileHome(
-            name: profile.name,
-            phoneNumber: profile.phoneNumber,
-            email: profile.email,
-            address: profile.address,
-            onEdit: _editProfile,
-          ),
-        ],
+                phoneNumber: profile.phoneNumber,
+                email: profile.email,
+                address: profile.address,
+                onEdit: _editProfile,
+              )
+            else
+              const SizedBox.shrink(),
+          ],
+        ),
       ),
       bottomNavigationBar: Consumer2<CartNotifier, OrdersProvider>(
         builder: (_, cart, orders, _) => CurvedNavigationBar(
@@ -140,10 +161,14 @@ class _MainNavWrapperState extends State<MainNavWrapper> {
           animationCurve: Curves.easeInOut,
           animationDuration: const Duration(milliseconds: 300),
           onTap: (i) {
-            setState(() => _currentIndex = i);
-            if (i == 4) {
-              context.read<OrdersProvider>().syncRemoteOrders(silent: true);
-              context.read<PrescriptionProvider>().refresh();
+            setState(() {
+              _currentIndex = i;
+              _visitedTabs.add(i);
+            });
+            if (i == 3) {
+              context.read<PrescriptionProvider>().ensureLoaded();
+            } else if (i == 4) {
+              context.read<CustomerAddressProvider>().ensureLoaded();
             }
           },
           items: [

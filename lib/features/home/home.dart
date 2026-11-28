@@ -32,6 +32,10 @@ class Home extends StatefulWidget {
 }
 
 class _HomeState extends State<Home> {
+  static List<Medicine> _cachedTrending = const [];
+  static DateTime? _trendingFetchedAt;
+  static const Duration _trendingTtl = Duration(minutes: 5);
+
   List<Medicine> _trendingMedicines = [];
   bool _isLoadingTrending = false;
 
@@ -43,7 +47,7 @@ class _HomeState extends State<Home> {
       if (mounted) {
         final cart = context.read<CartNotifier>();
         if (cart.remoteCart == null && !cart.isHydrating) {
-          cart.refresh();
+          cart.syncRemoteCart(force: false);
         }
       }
     });
@@ -51,18 +55,30 @@ class _HomeState extends State<Home> {
 
   Future<void> _handleRefresh() async {
     await Future.wait([
-      _fetchTrending(),
-      context.read<CartNotifier>().refresh(),
+      _fetchTrending(force: true),
+      context.read<CartNotifier>().refresh(force: true),
     ]);
   }
 
-  Future<void> _fetchTrending() async {
+  Future<void> _fetchTrending({bool force = false}) async {
+    if (!force &&
+        _cachedTrending.isNotEmpty &&
+        _trendingFetchedAt != null &&
+        DateTime.now().difference(_trendingFetchedAt!) < _trendingTtl) {
+      if (_trendingMedicines.isEmpty) {
+        setState(() => _trendingMedicines = _cachedTrending);
+      }
+      return;
+    }
     setState(() => _isLoadingTrending = true);
     try {
       final items = await ApiService.searchMedicines(limit: 20);
+      final parsed = items.map((m) => Medicine.fromJson(m)).toList();
+      _cachedTrending = parsed;
+      _trendingFetchedAt = DateTime.now();
       if (mounted) {
         setState(() {
-          _trendingMedicines = items.map((m) => Medicine.fromJson(m)).toList();
+          _trendingMedicines = parsed;
         });
       }
     } catch (_) {

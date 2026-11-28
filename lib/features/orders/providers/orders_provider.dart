@@ -15,6 +15,9 @@ class OrdersProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
   bool _disposed = false;
+  Future<void>? _inFlightSync;
+  DateTime? _lastSyncedAt;
+  static const Duration _staleDuration = Duration(minutes: 2);
 
   OrdersProvider([this._repository, List<OrderModel>? initial]) {
     if (initial != null) {
@@ -58,21 +61,60 @@ class OrdersProvider extends ChangeNotifier {
     _status = LoadStatus.hydrating;
     _safeNotify();
 
-    // 1. Hydrate local cache
+    // 1. Hydrate local cache only; remote orders are fetched lazily when Orders tab opens.
     final loaded = await repo.hydrate(uid);
     _orders.clear();
     _orders.addAll(loaded);
+    _lastSyncedAt = null;
 
     _status = LoadStatus.ready;
     _safeNotify();
-
-    // 2. Refresh remote orders in background
-    await syncRemoteOrders();
   }
 
-  Future<void> syncRemoteOrders({String? filterStatus, String? search, bool silent = false}) async {
+  Future<void> syncRemoteOrders({
+    String? filterStatus,
+    String? search,
+    bool silent = false,
+    bool force = false,
+  }) {
     final repo = _repository;
-    if (repo == null || ApiService.token == null) return;
+    if (repo == null || ApiService.token == null) return Future.value();
+
+    final isUnfiltered = filterStatus == null && (search == null || search.isEmpty);
+    if (isUnfiltered &&
+        !force &&
+        _lastSyncedAt != null &&
+        DateTime.now().difference(_lastSyncedAt!) < _staleDuration &&
+        _orders.isNotEmpty) {
+      return Future.value();
+    }
+    if (isUnfiltered && _inFlightSync != null) {
+      return _inFlightSync!;
+    }
+
+    final future = _doSyncRemoteOrders(
+      repo,
+      filterStatus: filterStatus,
+      search: search,
+      silent: silent,
+    );
+    if (isUnfiltered) {
+      _inFlightSync = future;
+      future.whenComplete(() {
+        if (identical(_inFlightSync, future)) {
+          _inFlightSync = null;
+        }
+      });
+    }
+    return future;
+  }
+
+  Future<void> _doSyncRemoteOrders(
+    OrdersRepository repo, {
+    String? filterStatus,
+    String? search,
+    bool silent = false,
+  }) async {
     if (!silent) {
       _isLoading = true;
       _errorMessage = null;
@@ -87,6 +129,7 @@ class OrdersProvider extends ChangeNotifier {
       if (filterStatus == null && (search == null || search.isEmpty)) {
         _orders.clear();
         _orders.addAll(remoteOrders);
+        _lastSyncedAt = DateTime.now();
         final uid = _userId;
         if (uid != null) {
           repo.schedulePersist(uid, _orders);
@@ -105,8 +148,8 @@ class OrdersProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> fetchOrders({bool silent = false}) async {
-    await syncRemoteOrders(silent: silent);
+  Future<void> fetchOrders({bool silent = false, bool force = false}) async {
+    await syncRemoteOrders(silent: silent, force: force);
   }
 
   Future<OrderModel> placeOrder({
@@ -225,7 +268,7 @@ class OrdersProvider extends ChangeNotifier {
   }
 
   Future<void> refresh() async {
-    await syncRemoteOrders();
+    await syncRemoteOrders(force: true);
   }
 
   Future<void> clearAll() async {
